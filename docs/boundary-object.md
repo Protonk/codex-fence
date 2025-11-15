@@ -1,9 +1,8 @@
 # Boundary Object (bo-v0)
 
-`codex-fence` represents every probe result as a "boundary object": a stable JSON record that carries
-just enough structure for automated processing while staying easy for humans to read. Each record tracks
-*one* attempted operation executed against *one* runtime stack and is designed to survive copy/paste and
-log aggregation.
+`codex-fence` represents every probe result as a "boundary object": a stable JSON record that carries just enough structure for automated processing while allowing input flexibility.
+
+Each record tracks *one* attempted operation executed against *one* runtime stack and is designed to survive copy/paste and log aggregation.
 
 ## Top-level fields
 
@@ -64,6 +63,4 @@ The payload keeps probe-specific scraps that would be lossy if converted to fixe
 | `stderr_snippet` | yes (nullable) | Same for stderr. |
 | `raw` | yes | Arbitrary JSON object with structured data for the probe (counts, timings, metadata). |
 
-Probes should only place *small* data in the payload—ideally <4 KB per record. Large logs should live
-elsewhere and be referenced via the `raw` object. Maintaining this discipline keeps the boundary objects
-portable and easy to diff.
+Probes should only place *small* data in the payload—ideally <4 KB per record. Large logs should live elsewhere and be referenced via the `raw` object. Maintaining this discipline keeps the boundary objects portable and easy to diff.
