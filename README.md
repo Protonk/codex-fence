@@ -42,6 +42,23 @@ Matrix all probes across all modes and store the JSON output in `out/`:
 make matrix
 ```
 
+## Tests
+
+Run the fast authoring checks with:
+
+```sh
+make test
+```
+
+The test runner (`tests/run.sh`) executes four lightweight suites:
+
+* `static_probe_contract` – lints every probe for the documented Bash contract (shebang, `set -euo pipefail`, syntax, ID wiring).
+* `capability_map_sync` – keeps `spec/capabilities.yaml`, `spec/capabilities-coverage.json`, and the probes in sync.
+* `boundary_object_schema` – validates the `bin/emit-record` output against the cfbo-v1 structure using `jq` only.
+* `harness_smoke` – runs a fixture probe through `bin/fence-run` baseline mode to prove the orchestration pipeline still works.
+
+All suites rely on standard Bash utilities and `jq`, so they run unchanged on macOS and inside the provided Codex containers.
+
 ## How probes work
 
 At a high level, a probe is a tiny, single-purpose program plus a contract for how it reports what happened.
