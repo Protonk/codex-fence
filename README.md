@@ -21,13 +21,12 @@ Three reasons:
 
 ## Requirements
 
-* POSIX shell utilities + `bash`
+* POSIX shell utilities + `bash 3.2`
 * `jq`
 * `make`
 * The `codex` CLI (only if you plan to exercise Codex modes)
-* Compatibility with macOS' system `/bin/bash` 3.2. That shell lacks associative arrays, `mapfile`, and other conveniences, so
-  every probe and test must stick to the portable subset of Bash features to guarantee `make test` and `make matrix` behave
-  the same inside Codex containers and on host Macs.
+
+The goal is to limit probe noise by keeping things lightweight and compatible with the toolchain shipped in macOS. We use `jq`, which must be installed, but that's merely a concession to sanity and could be relaxed in the future. 
 
 ## Usage
 
@@ -59,10 +58,6 @@ The test runner (`tests/run.sh`) executes four lightweight suites:
 * `capability_map_sync` – keeps `spec/capabilities.yaml`, `spec/capabilities-coverage.json`, and the probes in sync.
 * `boundary_object_schema` – validates the `bin/emit-record` output against the cfbo-v1 structure using `jq` only.
 * `harness_smoke` – runs a fixture probe through `bin/fence-run` baseline mode to prove the orchestration pipeline still works.
-
-All suites rely on standard Bash utilities and `jq`, so they run unchanged on macOS and inside the provided Codex containers.
-When adding new suites, remember the [Requirements](#requirements) constraint about `/bin/bash` 3.2 compatibility so `make
-test` continues to work everywhere Codex probes run.
 
 ## How probes work
 
