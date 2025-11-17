@@ -5,6 +5,9 @@ set -euo pipefail
 # an exact match (.git-shadow) to see whether write guards over-match.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
+helpers_lib="${repo_root}/tools/lib/helpers.sh"
+# shellcheck source=tools/lib/helpers.sh
+source "${helpers_lib}"
 
 run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="fs_git_like_name_write"
@@ -82,33 +85,18 @@ truncate_field() {
 stdout_snippet=$(truncate_field "${stdout_text}")
 stderr_snippet=$(truncate_field "${stderr_text}")
 
-target_realpath=$(python3 - <<'PY' "${target_file}"
-import os
-import sys
-print(os.path.realpath(sys.argv[1]))
-PY
-)
+target_realpath=$(portable_realpath "${target_file}")
 
 git_dir_path=$(cd "${repo_root}" && git rev-parse --git-dir 2>/dev/null || true)
 if [[ -n "${git_dir_path}" ]]; then
-  git_dir_realpath=$(cd "${repo_root}" && python3 - <<'PY' "${git_dir_path}"
-import os
-import sys
-print(os.path.realpath(sys.argv[1]))
-PY
-)
+  git_dir_realpath=$(cd "${repo_root}" && portable_realpath "${git_dir_path}")
 else
   git_dir_realpath=""
 fi
 
 target_size=""
 if [[ -f "${target_file}" ]]; then
-  target_size=$(python3 - <<'PY' "${target_file}"
-import os
-import sys
-print(os.path.getsize(sys.argv[1]))
-PY
-)
+  target_size=$(wc -c <"${target_file}" | tr -d '[:space:]')
 fi
 
 raw_payload=$(jq -n \

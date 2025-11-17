@@ -11,7 +11,7 @@ Prefer to add probes that:
 - Add edge-case variants for already-covered capabilities (e.g., symlink escapes, .git writes, network corner cases).
 
 Keep each probe:
-- Small and single-purpose.
+- Small and single-purpose. When you need reusable helpers (portable realpath/relpath, YAML parsing, etc.), source `tools/lib/helpers.sh` in your probe or tool instead of duplicating interpreter detection. Helpers should stay pure so probes remain focused.
 - Clearly labeled with `primary_capability_id`. Open `spec/capabilities.yaml` (or pipe it through `tools/capabilities_adapter.sh`) and choose the `capabilities[*].id` that best represents what you are exercising. That id becomes `primary_capability_id`. Optionally list related capabilities in `secondary_capability_ids`. `bin/emit-record` validates all ids through the adapter, so use the exact slugs.
 
 Never:

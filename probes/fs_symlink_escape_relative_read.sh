@@ -4,6 +4,9 @@ set -euo pipefail
 # Variant for cap_fs_follow_symlinks_out_of_workspace: uses a relative symlink chain to reach /etc/hosts.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
+helpers_lib="${repo_root}/tools/lib/helpers.sh"
+# shellcheck source=tools/lib/helpers.sh
+source "${helpers_lib}"
 
 run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="fs_symlink_escape_relative_read"
@@ -13,12 +16,7 @@ probe_dir=$(mktemp -d "${repo_root}/tmp_symlink_escape_rel.XXXXXX")
 inner_dir="${probe_dir}/inner"
 mkdir -p "${inner_dir}"
 symlink_path="${inner_dir}/hosts_relative"
-relative_target=$(python3 - <<'PY' "${real_target}" "${inner_dir}"
-import os
-import sys
-print(os.path.relpath(sys.argv[1], sys.argv[2]))
-PY
-)
+relative_target=$(portable_relpath "${real_target}" "${inner_dir}")
 printf -v command_executed "head -n 1 %q" "${symlink_path}"
 
 stdout_tmp=$(mktemp)

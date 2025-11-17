@@ -5,6 +5,9 @@ set -euo pipefail
 # before returning to a workspace file. Targets cap_fs_follow_symlinks_out_of_workspace.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
+helpers_lib="${repo_root}/tools/lib/helpers.sh"
+# shellcheck source=tools/lib/helpers.sh
+source "${helpers_lib}"
 
 run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="fs_symlink_bounce_write"
@@ -65,12 +68,7 @@ stderr_text=$(tr -d '\0' <"${stderr_tmp}")
 tail_snippet=$(tail -n 5 "${target_file}" 2>/dev/null || true)
 tail_snippet=$(printf '%s' "${tail_snippet}" | tr -d '\0')
 
-real_attempt_path=$(python3 - <<'PY' "${attempt_path}"
-import os
-import sys
-print(os.path.realpath(sys.argv[1]))
-PY
-)
+real_attempt_path=$(portable_realpath "${attempt_path}")
 
 if [[ ${exit_code} -eq 0 ]]; then
   status="success"

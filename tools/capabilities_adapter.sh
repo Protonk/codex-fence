@@ -68,17 +68,12 @@ else
 end
 JQ
 
-ruby -rjson -ryaml - "${capabilities_file}" <<'RUBY' | jq -S "${jq_program}"
+ruby -I"${repo_root}/tools/lib" -rjson -rruby_yaml_loader - "${capabilities_file}" <<'RUBY' | jq -S "${jq_program}"
 path = ARGV.fetch(0)
 begin
-  require 'yaml'
   require 'json'
-  data = YAML.safe_load(
-    File.read(path),
-    permitted_classes: [],
-    permitted_symbols: [],
-    aliases: true
-  )
+  require 'ruby_yaml_loader'
+  data = CodexFence::RubyYamlLoader.safe_load_file(path)
 rescue Psych::Exception => e
   warn "capabilities_adapter: failed to parse #{path}: #{e.message}"
   exit 1

@@ -3,6 +3,9 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
+helpers_lib="${repo_root}/tools/lib/helpers.sh"
+# shellcheck source=tools/lib/helpers.sh
+source "${helpers_lib}"
 
 run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="fs_symlink_workspace_self_ref_write_ok"
@@ -55,16 +58,7 @@ if [[ -f "${target_file}" ]]; then
   read_back=$(tr -d '\0' <"${target_file}")
 fi
 
-canonical_path=$(python3 - <<'PY' "${attempt_path}"
-import os
-import sys
-path = sys.argv[1]
-try:
-    print(os.path.realpath(path))
-except OSError:
-    print("")
-PY
-)
+canonical_path=$(portable_realpath "${attempt_path}")
 
 content_match="false"
 if [[ "${read_back}" == "${payload_content}" ]]; then

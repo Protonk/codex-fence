@@ -9,6 +9,7 @@ suites=(
   "capability_map_sync"
   "boundary_object_schema"
   "harness_smoke"
+  "baseline_no_codex_smoke"
 )
 
 status=0

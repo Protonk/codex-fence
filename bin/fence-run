@@ -21,6 +21,13 @@ if [[ ! -x "${probe_path}" ]]; then
   exit 1
 fi
 
+sandbox_requires_codex() {
+  if ! command -v codex >/dev/null 2>&1; then
+    echo "codex CLI not found; mode '${mode}' requires codex. Install codex or run baseline instead." >&2
+    exit 1
+  fi
+}
+
 sandbox_mode=""
 run_cmd=()
 case "${mode}" in
@@ -29,6 +36,7 @@ case "${mode}" in
     run_cmd=("${probe_path}")
     ;;
   codex-sandbox)
+    sandbox_requires_codex
     sandbox_mode="workspace-write"
     platform=$(uname -s)
     case "${platform}" in

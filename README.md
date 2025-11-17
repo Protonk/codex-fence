@@ -58,6 +58,7 @@ The test runner (`tests/run.sh`) executes four lightweight suites:
 * `capability_map_sync` – keeps `spec/capabilities.yaml`, `spec/capabilities-coverage.json`, and the probes in sync via the v2 adapter.
 * `boundary_object_schema` – validates the `bin/emit-record` output against the cfbo-v2 structure using `jq` only.
 * `harness_smoke` – runs a fixture probe through `bin/fence-run` baseline mode to prove the orchestration pipeline still works.
+* `baseline_no_codex_smoke` – shadows `codex` out of `PATH` and proves baseline runs still work without the Codex CLI, so macOS-only users stay unblocked.
 
 Need to double-check new capability IDs against the catalog? Run:
 
@@ -143,7 +144,7 @@ the harness:
 To keep the results meaningful and comparable:
 
 * Probes are **non-interactive** (no prompts, no TTY assumptions).
-* Probes are **small and focused**: one behavior per probe, no global test orchestration.
+* Probes are **small and focused**: one behavior per probe, no global test orchestration. If you need helper utilities (portable path resolution, relative paths, etc.), source `tools/lib/helpers.sh` instead of reimplementing interpreter detection in each probe.
 * Probes avoid mutating the host outside the workspace unless that mutation is exactly what they’re testing—and if so, they record the target path in the boundary object.
 * When a sandbox denies an operation, the probe should still exit cleanly and classify the outcome rather than crashing.
 
