@@ -13,7 +13,8 @@
       "fs_symlink_workspace_self_ref_write_ok",
       "fs_workspace_relative_segments_write_ok",
       "fs_workspace_unicode_filename_write_ok",
-      "fs_workspace_write_create"
+      "fs_workspace_write_create",
+      "fs_user_library_write_guard"
     ]
   },
   "cap_fs_read_git_metadata": {
@@ -70,7 +71,8 @@
     "has_probe": true,
     "probe_ids": [
       "net_outbound_example_https",
-      "net_outbound_example_http_head"
+      "net_outbound_example_http_head",
+      "net_outbound_ipv4_literal_denied"
     ]
   },
   "cap_net_localhost_only": {
@@ -98,7 +100,8 @@
     "has_probe": true,
     "probe_ids": [
       "sysctl_kern_boottime_read",
-      "sysctl_security_mac_proc_enforce"
+      "sysctl_security_mac_proc_enforce",
+      "sysctl_kern_kdebug_read"
     ]
   },
   "cap_mach_lookup_system_logger": {
