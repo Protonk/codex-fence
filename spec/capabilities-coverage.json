@@ -34,7 +34,8 @@
   "cap_fs_read_user_content": {
     "has_probe": true,
     "probe_ids": [
-      "fs_user_documents_read"
+      "fs_user_documents_read",
+      "fs_user_desktop_symlink_read"
     ]
   },
   "cap_fs_follow_symlinks_out_of_workspace": {
@@ -89,7 +90,8 @@
   "cap_sysctl_read_basic": {
     "has_probe": true,
     "probe_ids": [
-      "sysctl_hw_ncpu_read"
+      "sysctl_hw_ncpu_read",
+      "sysctl_hw_multi_key_read"
     ]
   },
   "cap_sysctl_read_sensitive": {
@@ -118,8 +120,10 @@
     ]
   },
   "cap_sandbox_profile_parameterization": {
-    "has_probe": false,
-    "probe_ids": []
+    "has_probe": true,
+    "probe_ids": [
+      "sandbox_profile_param_nested_workspace"
+    ]
   },
   "cap_agent_sandbox_env_marker": {
     "has_probe": true,
