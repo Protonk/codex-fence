@@ -57,7 +57,7 @@ valuable.
 - Changing `spec/capabilities.yaml` or `spec/capabilities-coverage.json`
   requires matching updates to `docs/capabilities.md` plus any references in
   README/AGENTS.
-- Updates to the boundary-object schema (`schema/boundary-object-cfbo-v2.json`)
+- Updates to the boundary-object schema (`schema/boundary-object-cfbo-v1.json`)
   must be mirrored in `docs/boundary-object.md` and, if the authoring workflow
   changes, in `docs/probes.md`.
 - If you add run modes, helper commands, or workflow changes, reflect them in

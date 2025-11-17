@@ -4,7 +4,7 @@ As the Probe Author, you:
 - Use the capability catalog in `spec/capabilities.yaml` to select accurate
   `primary_capability_id` values. `bin/emit-record` validates IDs, so use the
   exact slugs defined in that file.
-- Read `schema/boundary-object-cfbo-v2.json` alongside
+- Read `schema/boundary-object-cfbo-v1.json` alongside
   `docs/boundary-object.md` to understand every field the probe must provide.
 - Review existing scripts under `probes/<category>/` to see which behaviors already have
   coverage and how outcomes are classified. The mapping is mirrored in
@@ -31,7 +31,7 @@ Never:
 - Print anything besides the JSON boundary object to stdout. Use stderr for
   debugging only when necessary.
 
-## Probe description and agent guidance (cfbo-v2)
+## Probe description and agent guidance (cfbo-v1)
 
 A probe:
 1. Is an executable script under `probes/<category>/`, where `<category>`
@@ -65,9 +65,9 @@ Call `bin/emit-record` exactly once with:
 - Outcome metadata (`--status` → `result.observed_result`, `--errno`,
   `--message`, `--raw-exit-code`, etc.) plus `--payload-file`.
 
-See `docs/boundary-object.md` for a complete field description (cfbo-v2 adds
-`capabilities_schema_version` and `capability_context` snapshots to every
-record).
+See `docs/boundary-object.md` for a complete field description (cfbo-v1
+includes `capabilities_schema_version` and `capability_context` snapshots to
+provide full context for every record).
 
 ### Minimal example
 
@@ -99,7 +99,7 @@ Matching JSON output (trimmed for brevity):
 
 ```json
 {
-  "schema_version": "cfbo-v2",
+  "schema_version": "cfbo-v1",
   "capabilities_schema_version": 2,
   "probe": {
     "id": "fs_outside_workspace",

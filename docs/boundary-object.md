@@ -1,6 +1,6 @@
-# Probe Contract and Boundary Object (cfbo-v2)
+# Probe Contract and Boundary Object (cfbo-v1)
 
-`codex-fence` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v2** is the current contract. It incorporates the v2 capability schema (via `tools/capabilities_adapter.sh`) so every record carries a snapshot of the capability metadata it referenced.
+`codex-fence` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v1** is the current contract. It incorporates the current capability schema (via `tools/capabilities_adapter.sh`) so every record carries a snapshot of the capability metadata it referenced.
 
 Each boundary object captures *one* probe execution in one run mode. Probes are tiny scripts stored under `probes/<category>/` (organized by capability category) that:
 
@@ -12,13 +12,22 @@ Each boundary object captures *one* probe execution in one run mode. Probes are 
 
 See `AGENTS.md` for the workflow details expected from probe authors.
 
-## Boundary object layout (cfbo-v2)
+## Formal commitments
 
-The machine-readable definition lives in `schema/boundary-object-cfbo-v2.json` and is enforced by `bin/emit-record`.
+The project commits to the cfbo-v1 contract as specified by:
+
+- The machine-readable JSON schema at `schema/boundary-object-cfbo-v1.json`.
+- This document’s field-by-field explanations.
+
+Within cfbo-v1, the required fields, field names, and semantics described below are stable. Changes that break compatibility (renaming fields, relaxing/adding required fields, or altering meanings) require creating a new schema version and updating this document to match.
+
+## Boundary object layout (cfbo-v1)
+
+The machine-readable definition lives in `schema/boundary-object-cfbo-v1.json` and is enforced by `bin/emit-record`.
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `schema_version` | yes | Always `"cfbo-v2"`. |
+| `schema_version` | yes | Always `"cfbo-v1"`. |
 | `capabilities_schema_version` | yes (nullable) | The version from `spec/capabilities.yaml` that was loaded via the adapter (currently `2`). |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
@@ -108,7 +117,7 @@ Catch-all for probe-specific breadcrumbs. Keep these small (<4 KB).
 
 ### `capability_context`
 
-New in cfbo-v2. Every record includes the capability snapshot(s) that were resolved when the probe was emitted. This lets downstream tooling trace exactly which schema version and metadata were in effect.
+Every record includes the capability snapshot(s) that were resolved when the probe was emitted. This lets downstream tooling trace exactly which schema version and metadata were in effect.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -121,7 +130,7 @@ A trimmed record from `probes/filesystem/fs_outside_workspace.sh` (writes outsid
 
 ```json
 {
-  "schema_version": "cfbo-v2",
+  "schema_version": "cfbo-v1",
   "capabilities_schema_version": 2,
   "probe": {
     "id": "fs_outside_workspace",
@@ -174,3 +183,14 @@ A trimmed record from `probes/filesystem/fs_outside_workspace.sh` (writes outsid
   }
 }
 ```
+
+## Updating the commitments
+
+When the boundary-object contract needs to change in a backward-incompatible way, follow this procedure:
+
+1. Add a new schema file (for example `schema/boundary-object-cfbo-v2.json`) with an updated `$id`, `title`, and `schema_version` constant while preserving the prior file unchanged.
+2. Update this document to describe the new version, including any added or removed fields and the rationale for the change.
+3. Refresh `AGENTS.md`, `README.md`, `docs/probes.md`, and any tooling that validates or emits boundary objects (`bin/emit-record`, `tests/`, probe helpers) so they reference and enforce the new schema.
+4. Document the migration expectations (whether older versions are still accepted, and for how long) alongside the new version announcement.
+
+Until such a change is made, cfbo-v1 remains the committed contract.
