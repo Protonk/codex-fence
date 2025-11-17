@@ -9,9 +9,9 @@ probe_name="fs_workspace_relative_segments_write_ok"
 probe_version="1"
 primary_capability_id="cap_fs_write_workspace_tree"
 
-base_dir="${repo_root}/tmp/relative_segments/a/b/c"
-mkdir -p "${base_dir}"
-relative_path="tmp/relative_segments/a/b/../b/./c/../c/target.txt"
+relative_root=$(mktemp -d "${repo_root}/tmp/relative_segments.XXXXXX")
+mkdir -p "${relative_root}/a/b/c"
+relative_path="${relative_root#"${repo_root}/"}/a/b/../b/./c/../c/target.txt"
 attempt_path="${repo_root}/${relative_path}"
 
 payload_content="relative segments write $(date -u +%Y-%m-%dT%H:%M:%SZ) $$"
@@ -22,7 +22,7 @@ stderr_tmp=$(mktemp)
 payload_tmp=$(mktemp)
 cleanup() {
   rm -f "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}"
-  rm -rf "${repo_root}/tmp/relative_segments"
+  rm -rf "${relative_root}"
 }
 trap cleanup EXIT
 
@@ -95,10 +95,12 @@ data_length=${#payload_content}
 
 raw_payload=$(jq -n \
   --arg relative_path "${relative_display}" \
+  --arg absolute_path "${attempt_path}" \
   --arg canonical_path "${canonical_path}" \
   --arg data_written "${payload_content}" \
   --arg data_read "${read_back}" \
   '{relative_path: $relative_path,
+    absolute_path: $absolute_path,
     canonical_path: $canonical_path,
     data_written: $data_written,
     data_read: $data_read,
@@ -112,11 +114,15 @@ jq -n \
     stderr_snippet: ($stderr_snippet | if length > 400 then (.[:400] + "…") else . end),
     raw: $raw}' >"${payload_tmp}"
 
+match_bool="false"
+if [[ "${content_match}" == "true" ]]; then
+  match_bool="true"
+fi
 operation_args=$(jq -n \
   --arg relative_path "${relative_display}" \
   --arg canonical_path "${canonical_path}" \
   --argjson write_bytes "${data_length}" \
-  --argjson match $( [[ "${content_match}" == "true" ]] && echo true || echo false ) \
+  --argjson match "${match_bool}" \
   '{relative_path_used: $relative_path,
     canonical_path: $canonical_path,
     write_then_read_bytes: $write_bytes,
@@ -128,7 +134,7 @@ operation_args=$(jq -n \
   --probe-version "${probe_version}" \
   --primary-capability-id "${primary_capability_id}" \
   --command "${command_executed}" \
-  --category "filesystem" \
+  --category "fs" \
   --verb "write_then_read_file" \
   --target "${relative_display}" \
   --status "${status}" \

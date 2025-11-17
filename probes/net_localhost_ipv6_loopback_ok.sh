@@ -8,6 +8,7 @@ run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="net_localhost_ipv6_loopback_ok"
 probe_version="1"
 primary_capability_id="cap_net_localhost_only"
+network_disabled_marker="${CODEX_SANDBOX_NETWORK_DISABLED:-}"
 
 python_code=$(cat <<'PY'
 import json
@@ -182,12 +183,28 @@ if [[ -s "${stdout_tmp}" ]] && jq -e . "${stdout_tmp}" >/dev/null 2>&1; then
   raw_json=$(jq -c '.' "${stdout_tmp}")
 fi
 
+ipv4_ok="false"
+ipv6_ok="false"
+port_value=""
+if [[ "${raw_json}" != "{}" ]]; then
+  ipv4_ok=$(printf '%s' "${raw_json}" | jq -r 'if has("requests") then (.requests.ipv4.ok // false) else false end' 2>/dev/null || echo "false")
+  ipv6_ok=$(printf '%s' "${raw_json}" | jq -r 'if has("requests") then (.requests.ipv6.ok // false) else false end' 2>/dev/null || echo "false")
+  port_value=$(printf '%s' "${raw_json}" | jq -r '(.port // "")' 2>/dev/null || echo "")
+fi
+
+lower_all=$(printf '%s\n%s' "${stdout_text}" "${stderr_text}" | tr 'A-Z' 'a-z')
 if [[ ${exit_code} -eq 0 ]]; then
   status="success"
   message="IPv4 and IPv6 loopback HTTP requests succeeded"
 else
-  lower_all=$(printf '%s\n%s' "${stdout_text}" "${stderr_text}" | tr 'A-Z' 'a-z')
-  if [[ "${lower_all}" == *"permission denied"* ]] || [[ "${lower_all}" == *"operation not permitted"* ]] || [[ "${lower_all}" == *"network is unreachable"* ]]; then
+  if [[ "${ipv4_ok}" == "true" || "${ipv6_ok}" == "true" ]]; then
+    status="partial"
+    message="IPv4 success=${ipv4_ok}, IPv6 success=${ipv6_ok}"
+  elif [[ -n "${network_disabled_marker}" ]]; then
+    status="denied"
+    errno_value="EPERM"
+    message="Loopback network disabled via marker"
+  elif [[ "${lower_all}" == *"permission denied"* ]] || [[ "${lower_all}" == *"operation not permitted"* ]] || [[ "${lower_all}" == *"network is unreachable"* ]] || [[ "${lower_all}" == *"connection refused"* ]] || [[ "${lower_all}" == *"couldn't connect"* ]] || [[ "${lower_all}" == *"failed to connect"* ]]; then
     status="denied"
     errno_value="EPERM"
     message="Loopback network access denied"
@@ -195,6 +212,11 @@ else
     status="error"
     message="Loopback IPv6 probe failed"
   fi
+fi
+
+target_label="loopback_dual_stack"
+if [[ -n "${port_value}" ]]; then
+  target_label="127.0.0.1:${port_value},[::1]:${port_value}"
 fi
 
 jq -n \
@@ -207,15 +229,16 @@ jq -n \
 
 operation_args=$(jq -n \
   --argjson raw "${raw_json}" \
-  'if $raw == {} then {port: null, ipv4: null, ipv6: null}
+  --arg marker "${network_disabled_marker}" \
+  'if $raw == {} then {port: null, ipv4: null, ipv6: null, summary: null, network_disabled_marker: (if ($marker | length) > 0 then $marker else null end)}
    else {
      port: $raw.port,
      ipv4: $raw.requests.ipv4,
      ipv6: $raw.requests.ipv6,
-     summary: $raw.summary
+     summary: $raw.summary,
+     network_disabled_marker: (if ($marker | length) > 0 then $marker else null end)
    }
-  end
-  ')
+  end')
 
 "${emit_record_bin}" \
   --run-mode "${run_mode}" \
@@ -223,9 +246,9 @@ operation_args=$(jq -n \
   --probe-version "${probe_version}" \
   --primary-capability-id "${primary_capability_id}" \
   --command "${command_executed}" \
-  --category "network" \
+  --category "net" \
   --verb "localhost_dual_stack_probe" \
-  --target "loopback_dual_stack" \
+  --target "${target_label}" \
   --status "${status}" \
   --errno "${errno_value}" \
   --message "${message}" \

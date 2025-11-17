@@ -9,7 +9,11 @@ probe_name="fs_workspace_unicode_filename_write_ok"
 probe_version="1"
 primary_capability_id="cap_fs_write_workspace_tree"
 
-relative_dir="tmp/emoji 🚧/deep dir/文件"
+tmp_root="${repo_root}/tmp"
+mkdir -p "${tmp_root}"
+unicode_root=$(mktemp -d "${tmp_root}/unicode_path.XXXXXX")
+nested_component="emoji 🚧/deep dir/文件"
+relative_dir="${unicode_root#"${repo_root}/"}/${nested_component}"
 attempt_relative_path="${relative_dir}/payload.txt"
 attempt_path="${repo_root}/${attempt_relative_path}"
 mkdir -p "$(dirname "${attempt_path}")"
@@ -22,7 +26,7 @@ stderr_tmp=$(mktemp)
 payload_tmp=$(mktemp)
 cleanup() {
   rm -f "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}"
-  rm -rf "${repo_root}/tmp/emoji 🚧"
+  rm -rf "${unicode_root}"
 }
 trap cleanup EXIT
 
@@ -91,11 +95,13 @@ data_length=${#payload_content}
 
 raw_payload=$(jq -n \
   --arg relative_path "${relative_display}" \
+  --arg absolute_path "${attempt_path}" \
   --arg canonical_path "${canonical_path}" \
   --arg data_written "${payload_content}" \
   --arg data_read "${read_back}" \
   --argjson data_length "${data_length}" \
   '{relative_path: $relative_path,
+    absolute_path: $absolute_path,
     canonical_path: $canonical_path,
     data_written: $data_written,
     data_read: $data_read,
@@ -110,11 +116,15 @@ jq -n \
     stderr_snippet: ($stderr_snippet | if length > 400 then (.[:400] + "…") else . end),
     raw: $raw}' >"${payload_tmp}"
 
+match_bool="false"
+if [[ "${content_match}" == "true" ]]; then
+  match_bool="true"
+fi
 operation_args=$(jq -n \
   --arg relative_path "${relative_display}" \
   --arg canonical_path "${canonical_path}" \
   --argjson data_length "${data_length}" \
-  --argjson match $( [[ "${content_match}" == "true" ]] && echo true || echo false ) \
+  --argjson match "${match_bool}" \
   '{relative_path: $relative_path,
     canonical_path: $canonical_path,
     write_then_read_bytes: $data_length,
@@ -126,7 +136,7 @@ operation_args=$(jq -n \
   --probe-version "${probe_version}" \
   --primary-capability-id "${primary_capability_id}" \
   --command "${command_executed}" \
-  --category "filesystem" \
+  --category "fs" \
   --verb "write_then_read_file" \
   --target "${relative_display}" \
   --status "${status}" \

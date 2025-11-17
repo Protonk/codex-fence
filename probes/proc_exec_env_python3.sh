@@ -86,7 +86,8 @@ operation_args=$(jq -n \
   --arg python_code "${python_code}" \
   --argjson python_info "${raw_json}" \
   '{argv: [$env_bin, "python3", "-c", $python_code],
-    interpreter_reported: (if $python_info == {} then null else $python_info.sys_executable end)}')
+    interpreter_reported: (if $python_info == {} then null else $python_info.sys_executable end),
+    reported_version: (if $python_info == {} then null else $python_info.sys_version end)}')
 
 "${emit_record_bin}" \
   --run-mode "${run_mode}" \
@@ -94,7 +95,7 @@ operation_args=$(jq -n \
   --probe-version "${probe_version}" \
   --primary-capability-id "${primary_capability_id}" \
   --command "${command_executed}" \
-  --category "process" \
+  --category "proc" \
   --verb "exec_env_python3" \
   --target "${env_bin}" \
   --status "${status}" \

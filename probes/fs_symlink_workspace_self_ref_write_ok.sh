@@ -106,12 +106,14 @@ symlink_info=$(jq -n \
 
 raw_payload=$(jq -n \
   --arg relative_path "${attempt_relative_path}" \
+  --arg absolute_path "${attempt_path}" \
   --arg canonical_path "${canonical_path}" \
   --arg target_file "${target_file}" \
   --arg data_written "${payload_content}" \
   --arg data_read "${read_back}" \
   --argjson symlink "${symlink_info}" \
   '{relative_path: $relative_path,
+    absolute_path: $absolute_path,
     canonical_path: $canonical_path,
     target_file: $target_file,
     symlink: $symlink,
@@ -127,12 +129,16 @@ jq -n \
     stderr_snippet: ($stderr_snippet | if length > 400 then (.[:400] + "…") else . end),
     raw: $raw}' >"${payload_tmp}"
 
+verified_bool="false"
+if [[ "${content_match}" == "true" ]]; then
+  verified_bool="true"
+fi
 operation_args=$(jq -n \
   --arg relative_path "${attempt_relative_path}" \
   --arg canonical_path "${canonical_path}" \
   --arg loop_link "${loop_link}" \
   --arg loop_target "../selflink" \
-  --argjson verified $( [[ "${content_match}" == "true" ]] && echo true || echo false ) \
+  --argjson verified "${verified_bool}" \
   '{relative_path: $relative_path,
     canonical_path: $canonical_path,
     symlink: {path: $loop_link, target: $loop_target},
@@ -145,7 +151,7 @@ operation_args=$(jq -n \
   --primary-capability-id "${primary_capability_id}" \
   --secondary-capability-id "${secondary_capability_id}" \
   --command "${command_executed}" \
-  --category "filesystem" \
+  --category "fs" \
   --verb "write_then_read_file_via_symlink" \
   --target "${attempt_relative_path}" \
   --status "${status}" \
