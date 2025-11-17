@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Protonk/codex-fence/schema/boundary-object-cfbo-v2.json",
-  "title": "Codex Fence Boundary Object (cfbo-v2)",
-  "description": "Record of a single probe execution aligned with the v2 capability map (capabilities.yaml schema_version=2).",
+  "$id": "https://github.com/Protonk/codex-fence/schema/boundary-object-cfbo-v1.json",
+  "title": "Codex Fence Boundary Object (cfbo-v1)",
+  "description": "Record of a single probe execution aligned with the current capability map (capabilities.yaml schema_version=2).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "cfbo-v2"
+      "const": "cfbo-v1"
     },
     "capabilities_schema_version": {
       "description": "The schema_version value from capabilities.yaml used when interpreting capability ids (e.g., 2).",

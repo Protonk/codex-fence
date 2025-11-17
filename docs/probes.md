@@ -48,7 +48,7 @@ captured.
 ## What a probe emits
 
 Every probe emits one [boundary object](boundary-object.md) that conforms to
-`schema/boundary-object-cfbo-v2.json`. Required data includes:
+`schema/boundary-object-cfbo-v1.json`. Required data includes:
 
 - Probe identity (`probe.id`, `probe.version`,
   `probe.primary_capability_id`, `probe.secondary_capability_ids`).

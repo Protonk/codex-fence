@@ -35,17 +35,17 @@ part of the default macOS install.
 Probes are tiny Bash scripts that perform one observable action and emit a
 single JSON boundary object describing what happened. Probe authors work from
 the capability catalog in `spec/capabilities.yaml`, reuse helpers from
-`tools/lib/helpers.sh`, and rely on `bin/emit-record` to enforce the cfbo-v2
+`tools/lib/helpers.sh`, and rely on `bin/emit-record` to enforce the cfbo-v1
 schema. These scripts intentionally avoid non-portable Bash features so they can run
 unchanged on macOS’ `/bin/bash 3.2` and Linux `/usr/bin/env bash`. 
 
 A detailed, human-readable walk-through—including the execution contract,
 shared helpers, and how `bin/fence-run` orchestrates modes—lives in
-[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary-object-cfbo-v2.json](schema/boundary-object-cfbo-v2.json) and is described in more detail with examples in [docs/boundary-object.md](docs/boundary-object.md).
+[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary-object-cfbo-v1.json](schema/boundary-object-cfbo-v1.json) and is described in more detail with examples in [docs/boundary-object.md](docs/boundary-object.md).
 
 ## Usage
 
-Each probe run produces a "codex fence boundary object" (`cfbo-v2`) following the above schema that the harness stores under `out/`. 
+Each probe run produces a "codex fence boundary object" (`cfbo-v1`) following the above schema that the harness stores under `out/`.
 
 ### Run a single probe
 
