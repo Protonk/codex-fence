@@ -159,7 +159,7 @@ fi
 capability_snapshot() {
   local cap_id="$1"
   local snapshot
-  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, platform, layer, status}' <<<"${capabilities_json}")
+  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, platform, layer}' <<<"${capabilities_json}")
   if [[ -z "${snapshot}" || "${snapshot}" == "null" ]]; then
     echo "Unable to resolve capability metadata for ${cap_id}" >&2
     exit 1

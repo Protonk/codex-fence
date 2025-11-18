@@ -177,7 +177,7 @@
       "type": "object",
       "description": "Minimal snapshot of a capability from capabilities.yaml v2 used by this probe.",
       "additionalProperties": false,
-      "required": ["id", "category", "platform", "layer", "status"],
+      "required": ["id", "category", "platform", "layer"],
       "properties": {
         "id": {
           "type": "string",
@@ -197,11 +197,6 @@
         "layer": {
           "type": "string",
           "description": "Layer at which the capability exists (e.g., os_sandbox, agent_policy)."
-        },
-        "status": {
-          "type": "string",
-          "description": "Maturity of the capability definition.",
-          "enum": ["core", "experimental", "planned"]
         }
       }
     }

@@ -51,9 +51,7 @@ else
           category: ($cap.category // null),
           platform: ($cap.platform | to_array),
           layer: ($cap.layer // null),
-          status: ($cap.status // null),
           description: ($cap.description // null),
-          level: ($cap.level // null),
           notes: ($cap.notes // null),
           operations: {
             allow: ($ops.allow | to_array),

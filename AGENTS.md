@@ -162,8 +162,7 @@ Matching JSON output (trimmed for brevity):
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
       "platform": ["macos"],
-      "layer": "os_sandbox",
-      "status": "core"
+      "layer": "os_sandbox"
     },
     "secondary": []
   },

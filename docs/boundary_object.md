@@ -121,7 +121,7 @@ Every record includes the capability snapshot(s) that were resolved when the pro
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `primary` | yes | Object with `id`, `category`, `platform`, `layer`, `status` from the adapter. |
+| `primary` | yes | Object with `id`, `category`, `platform`, `layer` from the adapter. |
 | `secondary` | no | Array of the same structure (may be empty). |
 
 ## Example
@@ -168,8 +168,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
       "platform": ["macos"],
-      "layer": "os_sandbox",
-      "status": "core"
+      "layer": "os_sandbox"
     },
     "secondary": []
   },
