@@ -22,7 +22,7 @@ valuable.
   small; tooling avoids reaching into unrelated directories unless required.
 - **Document contracts.** When adding configuration fields, schema changes, or
   helper functions, update the relevant Markdown (`docs/probes.md`,
-  `docs/boundary-object.md`, `docs/capabilities.md`, or README) in the same
+  `docs/boundary_object.md`, `docs/capabilities.md`, or README) in the same
   change.
 
 ## Repository areas
@@ -54,11 +54,11 @@ valuable.
 
 ### Documentation and catalogs
 
-- Changing `spec/capabilities.yaml` or `spec/capabilities-coverage.json`
+- Changing `spec/capabilities.yaml` or `docs/capabilities_coverage.json`
   requires matching updates to `docs/capabilities.md` plus any references in
   README/AGENTS.
-- Updates to the boundary-object schema (`schema/boundary-object-cfbo-v1.json`)
-  must be mirrored in `docs/boundary-object.md` and, if the authoring workflow
+- Updates to the boundary-object schema (`schema/boundary_object_cfbo_v1.json`)
+  must be mirrored in `docs/boundary_object.md` and, if the authoring workflow
   changes, in `docs/probes.md`.
 - If you add run modes, helper commands, or workflow changes, reflect them in
   README (usage/tests sections) and `AGENTS.md`.

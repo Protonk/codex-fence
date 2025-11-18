@@ -41,7 +41,7 @@ unchanged on macOS’ `/bin/bash 3.2` and Linux `/usr/bin/env bash`.
 
 A detailed, human-readable walk-through—including the execution contract,
 shared helpers, and how `bin/fence-run` orchestrates modes—lives in
-[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary-object-cfbo-v1.json](schema/boundary-object-cfbo-v1.json) and is described in more detail with examples in [docs/boundary-object.md](docs/boundary-object.md).
+[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary_object_cfbo_v1.json](schema/boundary_object_cfbo_v1.json) and is described in more detail with examples in [docs/boundary_object.md](docs/boundary_object.md).
 
 ## Usage
 

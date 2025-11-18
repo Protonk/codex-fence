@@ -47,8 +47,8 @@ captured.
 
 ## What a probe emits
 
-Every probe emits one [boundary object](boundary-object.md) that conforms to
-`schema/boundary-object-cfbo-v1.json`. Required data includes:
+Every probe emits one [boundary object](boundary_object.md) that conforms to
+`schema/boundary_object_cfbo_v1.json`. Required data includes:
 
 - Probe identity (`probe.id`, `probe.version`,
   `probe.primary_capability_id`, `probe.secondary_capability_ids`).
@@ -59,7 +59,7 @@ Every probe emits one [boundary object](boundary-object.md) that conforms to
   `payload.raw` for structured notes).
 - Capability context snapshots embedded by `bin/emit-record`.
 
-`docs/boundary-object.md` describes every field along with examples. Treat
+`docs/boundary_object.md` describes every field along with examples. Treat
 missing or malformed JSON as a probe failure—`bin/fence-run` will not try to
 coerce bad output into a result.
 

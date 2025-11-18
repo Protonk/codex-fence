@@ -63,11 +63,11 @@ while IFS=$'\t' read -r cap_id has_probe probe_list; do
     status=1
   fi
 
-done < <(jq -r 'to_entries[] | [.key, (.value.has_probe|tostring), (.value.probe_ids|join(","))] | @tsv' spec/capabilities-coverage.json)
+done < <(jq -r 'to_entries[] | [.key, (.value.has_probe|tostring), (.value.probe_ids|join(","))] | @tsv' docs/capabilities_coverage.json)
 
 for cap in "${capability_ids[@]}"; do
   if ! list_contains "${cap}" "${coverage_cap_ids[@]}"; then
-    echo "  [FAIL] capability_map_sync: spec/capabilities-coverage.json missing entry for '${cap}'" >&2
+    echo "  [FAIL] capability_map_sync: docs/capabilities_coverage.json missing entry for '${cap}'" >&2
     status=1
   fi
 

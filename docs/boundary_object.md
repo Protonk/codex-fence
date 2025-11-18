@@ -16,14 +16,14 @@ See `AGENTS.md` for the workflow details expected from probe authors.
 
 The project commits to the cfbo-v1 contract as specified by:
 
-- The machine-readable JSON schema at `schema/boundary-object-cfbo-v1.json`.
+- The machine-readable JSON schema at `schema/boundary_object_cfbo_v1.json`.
 - This document’s field-by-field explanations.
 
 Within cfbo-v1, the required fields, field names, and semantics described below are stable. Changes that break compatibility (renaming fields, relaxing/adding required fields, or altering meanings) require creating a new schema version and updating this document to match.
 
 ## Boundary object layout (cfbo-v1)
 
-The machine-readable definition lives in `schema/boundary-object-cfbo-v1.json` and is enforced by `bin/emit-record`.
+The machine-readable definition lives in `schema/boundary_object_cfbo_v1.json` and is enforced by `bin/emit-record`.
 
 | Field | Required | Description |
 | --- | --- | --- |
@@ -188,7 +188,7 @@ A trimmed record from `probes/filesystem/fs_outside_workspace.sh` (writes outsid
 
 When the boundary-object contract needs to change in a backward-incompatible way, follow this procedure:
 
-1. Add a new schema file (for example `schema/boundary-object-cfbo-v2.json`) with an updated `$id`, `title`, and `schema_version` constant while preserving the prior file unchanged.
+1. Add a new schema file (for example `schema/boundary_object_cfbo_v2.json`) with an updated `$id`, `title`, and `schema_version` constant while preserving the prior file unchanged.
 2. Update this document to describe the new version, including any added or removed fields and the rationale for the change.
 3. Refresh `AGENTS.md`, `README.md`, `docs/probes.md`, and any tooling that validates or emits boundary objects (`bin/emit-record`, `tests/`, probe helpers) so they reference and enforce the new schema.
 4. Document the migration expectations (whether older versions are still accepted, and for how long) alongside the new version announcement.
