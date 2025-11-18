@@ -1,7 +1,15 @@
 SHELL := /bin/bash
-PROBE_ROOTS := $(wildcard probes/regression probes/exploratory)
-PROBE_SCRIPTS := $(shell if [ -n "$(PROBE_ROOTS)" ]; then find $(PROBE_ROOTS) -type f -name '*.sh' -print; fi | LC_ALL=C sort)
-PROBES := $(notdir $(basename $(PROBE_SCRIPTS)))
+PROBE_MANIFEST_JSON := tmp/probes_manifest.json
+PROBE_MANIFEST_MK := tmp/probes_manifest.mk
+PROBE_MANIFEST_DEPS := $(shell find probes -type f -name '*.sh' -print)
+
+$(PROBE_MANIFEST_JSON) $(PROBE_MANIFEST_MK): $(PROBE_MANIFEST_DEPS)
+	ruby tools/generate_probe_manifest.rb --json $(PROBE_MANIFEST_JSON) --make $(PROBE_MANIFEST_MK)
+
+-include $(PROBE_MANIFEST_MK)
+
+PROBE_SCRIPTS ?=
+PROBES ?=
 OUTDIR := out
 PROBE ?=
 

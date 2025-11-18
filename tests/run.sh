@@ -111,6 +111,7 @@ second_tier_suites=(
   "boundary_object_schema"
   "harness_smoke"
   "baseline_no_codex_smoke"
+  "probe_runner_smoke"
 )
 
 status=0

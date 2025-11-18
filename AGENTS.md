@@ -51,6 +51,23 @@ the script under the matching tree; otherwise default to regression. Promoting
 an exploratory probe to regression is just a matter of moving it into the
 regression tree and rerunning the normal probe/test workflow.
 
+## Probe manifest and runner API
+
+`tools/generate_probe_manifest.rb` materializes probe metadata into
+`tmp/probes_manifest.json` (plus a Makefile fragment). This keeps `make matrix`
+from re-discovering the tree every time and provides a single source of truth
+for downstream tooling. The manifest records each probe’s id, path, category,
+role, capability ids, checksum, and whether it opts into the module runner API.
+
+`bin/probe-runner` is the new execution harness for module probes. You opt in by
+adding `# probe_runner_api: module` near the top of the script and defining a
+`run_probe` function that calls `emit_result …` (provided by
+`tools/lib/probe_runner_module.sh`) exactly once. `emit_result` accepts the same
+flags you would normally pass to `bin/emit-record` (`--status`, `--command`,
+`--category`, `--verb`, `--target`, `--payload-file`, etc.). The runner merges
+you, so the script stays focused on the observable behavior. Legacy probes keep
+running as standalone scripts until they migrate.
+
 ## Probe description and agent guidance (cfbo-v1)
 
 A probe:

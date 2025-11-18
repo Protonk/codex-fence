@@ -1,2 +1,4 @@
 out/
 .DS_Store
+tmp/probes_manifest.json
+tmp/probes_manifest.mk

@@ -113,3 +113,40 @@ The fast authoring loop favors single-probe runs:
 
 See `AGENTS.md` for the full Probe Author workflow and contribution
 expectations, and `README.md` for how probes fit into the broader harness.
+
+## Probe manifest and runner API
+
+`tools/generate_probe_manifest.rb` scans the `probes/` tree and writes two
+artifacts under `tmp/`:
+
+- `probes_manifest.json` – machine-readable metadata (id, path, role, category,
+  capability ids, runner API).
+- `probes_manifest.mk` – Makefile fragment that seeds `PROBE_SCRIPTS` /
+  `PROBES`. `make` regenerates both whenever a probe script changes.
+
+Future tooling (including the runner) reads the JSON manifest instead of
+re-walking the filesystem every time. The manifest also records whether a probe
+opts into the new module API.
+
+### Module runner API
+
+`bin/probe-runner` can execute probes that declare
+`# probe_runner_api: module` near the top of the script. Module probes:
+
+1. Continue to live entirely in Bash and keep their core logic localized.
+2. Define a `run_probe` function that performs the observable operation.
+3. Call `emit_result …` (provided by `tools/lib/probe_runner_module.sh`)
+   exactly once to hand structured output back to the runner.
+
+`emit_result` accepts the same flags that `bin/emit-record` expects (`--status`,
+`--command`, `--category`, `--verb`, `--target`, `--raw-exit-code`,
+`--errno`, `--message`, `--payload-file`, `--operation-args`, etc.). The runner
+captures those values, combines them with the manifest metadata
+(`probe_name`, version, capability ids), and invokes `bin/emit-record` on the
+probe’s behalf. This keeps each probe’s observational logic in the same file
+while moving the schema boilerplate into the runner.
+
+During the transition, legacy probes continue to execute directly (each script
+invokes `bin/emit-record` itself). The module API is available for new probes
+and eventually for migrating existing ones once the manifest + runner pipeline
+lands.
