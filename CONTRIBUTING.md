@@ -7,7 +7,7 @@ expectations see the Probe Author contract in [probes/AGENTS.md](probes/AGENTS.m
 ## Scope
 
 Use this guide when you plan to:
-- Edit or add shell/Ruby helpers under `tools/` or `bin/`.
+- Edit or add shell helpers under `tools/`, `lib/', or `bin/`.
 - Modify the Makefile, capability catalog, schema, or adapters.
 - Extend `tests/` or its fixtures.
 - Update documentation outside a single probe (README, `docs/*.md`, etc.).
@@ -21,8 +21,7 @@ valuable.
 - **Single responsibility.** Helpers stay pure and composable; probes remain
   small; tooling avoids reaching into unrelated directories unless required.
 - **Document contracts.** When adding configuration fields, schema changes, or
-  helper functions, update the relevant Markdown (`docs/probes.md`,
-  `docs/boundary_object.md`, `spec/AGENTS.md`, or README) in the same change.
+  helper functions, update the relevant documentation in the same change.
 
 ## Repository areas
 
@@ -32,8 +31,9 @@ valuable.
   `lib/portable_realpath.sh`). Keep helpers pure (no global state or side
   effects) so probes and tests can source them safely.
 - Project-level scripts (lint, validation, adapters) live under `tools/`.
-  `tools/light_lint.sh` is the shared lint entry point—prefer extending it for
-  new checks instead of duplicating logic elsewhere.
+  The fast probe lint entry point, `tests/probe_contract/light_lint.sh`,
+  lives next to the static probe contract suite—prefer extending it for new
+  checks instead of duplicating logic elsewhere.
 - `bin/emit-record`, `bin/fence-run`, and any new binaries must stay
   dependency-free beyond POSIX + `jq`.
 
@@ -55,5 +55,4 @@ Updates to the capabilities catalog, located at `schema/capabilities.json`, or t
 - `schema/capabilities.json` is documented in `docs/capabilities.md`
 - `schema/boundary_object.json` is documented in `docs/boundary_object.md`
 Ensure these files stay in sync.
-
 

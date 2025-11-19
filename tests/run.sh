@@ -46,7 +46,7 @@ done
 
 cd "${REPO_ROOT}"
 
-light_lint_bin="${REPO_ROOT}/tools/light_lint.sh"
+light_lint_bin="${script_dir}/probe_contract/light_lint.sh"
 if [[ ! -x "${light_lint_bin}" ]]; then
   echo "tests/run.sh: missing light lint helper at ${light_lint_bin}" >&2
   exit 1

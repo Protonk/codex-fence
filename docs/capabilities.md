@@ -54,34 +54,52 @@ Capability counts in this guide are descriptive; `capabilities.json` is the sour
 
 ### Example
 
-```yaml
-- id: cap_fs_read_workspace_tree
-  category: filesystem
-  layer: os_sandbox
-  status: core
-  description: Ability for commands to read files anywhere under the Codex workspace root(s).
-  operations:
-    allow:
-      - file-read*
-      - file-read-data
-      - file-read-metadata
-    deny: []
-  meta_ops: []
-  agent_controls: []
-  level: medium
-  notes: >
-    This is the “normal” mode for Auto / Full access in Codex – agents must be able to read the
-    checked-out project tree, but not arbitrary user directories. Expect to be implemented as
-    allow file-read* (subpath WRITABLE_ROOT_i) for each workspace root, with deny default.
-  sources:
-    - doc: apple_sandbox_guide
-      section: "2, 5.2 – File operations and allow/deny model"
-    - doc: chromium_sandbox_v2
-      section: "SBPL example using (subpath (param \"USER_HOME_DIR\"))"
-    - doc: run_code_sandbox
-      section: "Profile that allows read/write to $PWD only"
-    - doc: deep_dive_agent_sandboxes
-      section: "Codex Auto mode workspace access and SandboxPolicy.writable_roots"
+The following entry is copied verbatim from `schema/capabilities.json` to show how the JSON catalog represents a single capability:
+
+```json
+{
+  "id": "cap_fs_read_workspace_tree",
+  "category": "filesystem",
+  "layer": "os_sandbox",
+  "status": "core",
+  "description": "Ability for commands to read files anywhere under the Codex workspace root(s).",
+  "operations": {
+    "allow": [
+      "file-read*",
+      "file-read-data",
+      "file-read-metadata"
+    ],
+    "deny": [
+
+    ]
+  },
+  "meta_ops": [
+
+  ],
+  "agent_controls": [
+
+  ],
+  "level": "medium",
+  "notes": "This is the “normal” mode for Auto / Full access in Codex – agents must be able to read the checked-out project tree, but not arbitrary user directories. Expect to be implemented as allow file-read* (subpath WRITABLE_ROOT_i) for each workspace root, with deny default.\n",
+  "sources": [
+    {
+      "doc": "apple_sandbox_guide",
+      "section": "2, 5.2 – File operations and allow/deny model"
+    },
+    {
+      "doc": "chromium_sandbox_v2",
+      "section": "SBPL example using (subpath (param \"USER_HOME_DIR\"))"
+    },
+    {
+      "doc": "run_code_sandbox",
+      "section": "Profile that allows read/write to $PWD only"
+    },
+    {
+      "doc": "deep_dive_agent_sandboxes",
+      "section": "Codex Auto mode workspace access and SandboxPolicy.writable_roots"
+    }
+  ]
+}
 ```
 
 ---

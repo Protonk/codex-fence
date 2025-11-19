@@ -9,9 +9,11 @@ As the Probe Author, you:
 - Review existing probes under `probes/` to see which behaviors already have
   coverage and how outcomes are classified. The mapping is mirrored in
   `docs/capabilities_coverage.json`.
-- Keep a tight edit/test loop. Run `tests/run.sh --probe <id>` (or
-  `make probe PROBE=<id>`) while iterating, then run `make test` before sending
-  patches so the tiered suites catch portability and schema issues early.
+- Keep a tight edit/test loop. While iterating on a script, run
+  `tests/probe_contract/light_lint.sh probes/<id>.sh` to lint the probe in
+  isolation, then `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`)
+  before graduating to `make test` so the tiered suites catch portability and
+  schema issues early.
 
 Prefer to add probes that:
 - Target capability IDs with no existing probes, or

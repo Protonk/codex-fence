@@ -47,7 +47,6 @@
       "id": "cap_fs_read_workspace_tree",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability for commands to read files anywhere under the Codex workspace root(s).",
       "operations": {
         "allow": [
@@ -90,7 +89,6 @@
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability for commands to create/modify/delete files inside the workspace roots.",
       "operations": {
         "allow": [
@@ -128,7 +126,6 @@
       "id": "cap_fs_read_git_metadata",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Read-only access to .git directories under each workspace root.",
       "operations": {
         "allow": [
@@ -165,7 +162,6 @@
       "id": "cap_fs_read_system_roots",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Read-only access to core system directories needed for toolchains and runtimes.",
       "operations": {
         "allow": [
@@ -200,7 +196,6 @@
       "id": "cap_fs_read_user_content",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to read user content folders (Documents, Desktop, etc.) from within the sandbox.",
       "operations": {
         "allow": [
@@ -235,7 +230,6 @@
       "id": "cap_fs_follow_symlinks_out_of_workspace",
       "category": "filesystem",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Whether a process can escape workspace constraints via symlinks pointing outside writable roots.",
       "operations": {
         "allow": [
@@ -269,7 +263,6 @@
       "id": "cap_proc_exec_toolchain_outside_workspace",
       "category": "process",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to execute binaries located outside the workspace (e.g., system compilers, language runtimes).",
       "operations": {
         "allow": [
@@ -306,7 +299,6 @@
       "id": "cap_proc_fork_and_child_spawn",
       "category": "process",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to fork and spawn child processes within the sandbox.",
       "operations": {
         "allow": [
@@ -340,7 +332,6 @@
       "id": "cap_proc_unsandboxed_escalation",
       "category": "process",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability for a command to be re-run outside the OS-level sandbox after a denied attempt.",
       "operations": {
         "allow": [
@@ -369,7 +360,6 @@
       "id": "cap_net_outbound_any",
       "category": "network",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to open arbitrary outbound network connections (non-localhost).",
       "operations": {
         "allow": [
@@ -407,7 +397,6 @@
       "id": "cap_net_localhost_only",
       "category": "network",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to use localhost networking while remote IPs remain blocked.",
       "operations": {
         "allow": [
@@ -442,7 +431,6 @@
       "id": "cap_net_disabled_with_tag",
       "category": "network",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Network is disabled at the OS level and marked via an environment variable for child processes.",
       "operations": {
         "allow": [
@@ -471,7 +459,6 @@
       "id": "cap_sysctl_read_basic",
       "category": "sysctl",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to read non-sensitive sysctl values (e.g., OS version, CPU info).",
       "operations": {
         "allow": [
@@ -504,7 +491,6 @@
       "id": "cap_sysctl_read_sensitive",
       "category": "sysctl",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to read more sensitive sysctl values (e.g., kern.boottime) that may be blocked in tighter policies.",
       "operations": {
         "allow": [
@@ -537,7 +523,6 @@
       "id": "cap_mach_lookup_system_logger",
       "category": "ipc",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to communicate with selected system services via mach-lookup.",
       "operations": {
         "allow": [
@@ -570,7 +555,6 @@
       "id": "cap_sandbox_default_deny",
       "category": "sandbox_profile",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Sandbox profile denies all operations by default and selectively allows specific rules.",
       "operations": {
         "allow": [
@@ -607,7 +591,6 @@
       "id": "cap_sandbox_debug_and_trace_logging",
       "category": "sandbox_profile",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Ability to capture sandbox allow/deny events via system log or trace files.",
       "operations": {
         "allow": [
@@ -641,7 +624,6 @@
       "id": "cap_sandbox_profile_parameterization",
       "category": "sandbox_profile",
       "layer": "os_sandbox",
-      "status": "core",
       "description": "Use of runtime parameters (e.g., USER_HOME_DIR, WRITABLE_ROOT_i) to specialize sandbox profiles per process.",
       "operations": {
         "allow": [
@@ -676,7 +658,6 @@
       "id": "cap_agent_sandbox_env_marker",
       "category": "agent_sandbox_policy",
       "layer": "agent_runtime",
-      "status": "core",
       "description": "Child processes can detect Seatbelt usage via a dedicated environment variable.",
       "operations": {
         "allow": [
@@ -705,7 +686,6 @@
       "id": "cap_agent_approvals_mode",
       "category": "agent_sandbox_policy",
       "layer": "agent_runtime",
-      "status": "core",
       "description": "Human-facing approval modes (Read Only / Auto / Full Access) that gate sandboxing and escalation.",
       "operations": {
         "allow": [
@@ -735,7 +715,6 @@
       "id": "cap_agent_command_trust_list",
       "category": "agent_sandbox_policy",
       "layer": "agent_runtime",
-      "status": "core",
       "description": "Session-scoped trust lists and approval policies gate which commands may run (and whether they may run unsandboxed).",
       "operations": {
         "allow": [
@@ -764,7 +743,6 @@
       "id": "cap_agent_default_sandboxing",
       "category": "agent_sandbox_policy",
       "layer": "agent_runtime",
-      "status": "core",
       "description": "All commands go through a centralized execution path that applies sandboxing by default.",
       "operations": {
         "allow": [

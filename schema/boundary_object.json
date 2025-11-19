@@ -177,7 +177,7 @@
       "type": "object",
       "description": "Minimal snapshot of a capability from capabilities.json v3 used by this probe.",
       "additionalProperties": false,
-      "required": ["id", "category", "layer", "status", "level"],
+      "required": ["id", "category", "layer"],
       "properties": {
         "id": {
           "type": "string",
@@ -190,14 +190,6 @@
         "layer": {
           "type": "string",
           "description": "Layer at which the capability exists (e.g., os_sandbox, agent_runtime)."
-        },
-        "status": {
-          "type": "string",
-          "description": "Lifecycle tag for the capability entry (e.g., core)."
-        },
-        "level": {
-          "type": "string",
-          "description": "Relative severity/priority of the capability (e.g., low, medium, high)."
         }
       }
     }

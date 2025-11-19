@@ -76,7 +76,7 @@ changes by mode, Codex version, or host OS.
 
 ## Tests
 
-Probe development now centers on a fast single-probe loop plus a second tier of
+Probe development centers on a fast single-probe loop plus a second tier of
 portable validations. The entry point for both is `tests/run.sh`.
 
 - `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints just that

@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE' >&2
-Usage: tools/light_lint.sh <script> [<script> ...]
+Usage: tests/probe_contract/light_lint.sh <script> [<script> ...]
 
 Runs a lightweight lint pass (bash -n) against the provided probe scripts.
 The command exits non-zero if a script is missing or fails linting.
