@@ -2,7 +2,7 @@
 
 Thanks for improving codex-fence! This document covers repository-level work:
 tests, helper libraries, tooling, docs, and automation. For probe-specific
-expectations see the Probe Author contract in `AGENTS.md`--human and AI agents writing new probes should mainly concern themselves with that. 
+expectations see the Probe Author contract in [probes/AGENTS.md](probes/AGENTS.md)--human and AI agents writing new probes should mainly concern themselves with that. 
 
 ## Scope
 
@@ -49,13 +49,11 @@ valuable.
   Ensure they short-circuit quickly on missing prerequisites so macOS authors
   can still run `make test`.
 
-### Documentation and catalogs
+### Keeping schema documentation in sync
 
-- Changing `spec/capabilities.json` or `docs/capabilities_coverage.json`
-  requires matching updates to `spec/AGENTS.md` plus any references in
-  README/AGENTS.
-- Updates to the boundary-object schema (`schema/boundary_object_cfbo_v1.json`)
-  must be mirrored in `docs/boundary_object.md` and, if the authoring workflow
-  changes, in `docs/probes.md`.
-- If you add run modes, helper commands, or workflow changes, reflect them in
-  README (usage/tests sections) and `AGENTS.md`.
+Updates to the capabilities catalog, located at `schema/capabilities.json`, or the boundary object schema (`schema/boundary_object.json`) require matching updates in their documentation:
+- `schema/capabilities.json` is documented in `docs/capabilities.md`
+- `schema/boundary_object.json` is documented in `docs/boundary_object.md`
+Ensure these files stay in sync.
+
+

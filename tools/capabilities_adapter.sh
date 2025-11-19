@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 
-capabilities_file="${1:-${repo_root}/spec/capabilities.json}"
+capabilities_file="${1:-${repo_root}/schema/capabilities.json}"
 
 if [[ ! -f "${capabilities_file}" ]]; then
   echo "capabilities_adapter: unable to find capabilities.json at ${capabilities_file}" >&2

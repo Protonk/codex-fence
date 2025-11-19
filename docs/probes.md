@@ -6,6 +6,8 @@ matches the probe id), performs a single well-defined action, and reports what
 the Codex fence did with that action. This document explains how probes are
 built, how the harness runs them, and how their results are captured.
 
+This file serves as documentation. For authoritative, test-enforced Probe and Probe Author contracts, follow [probes/AGENTS.md](probes/AGENTS.md). 
+
 ## What makes a probe
 
 - **Location:** Scripts live under `probes/<probe_id>.sh`, and the filename is
@@ -19,7 +21,7 @@ built, how the harness runs them, and how their results are captured.
   capture that nuance in the payload.
 - **Capabilities:** Every probe declares exactly one
   `primary_capability_id` (with optional `secondary_capability_ids`). The ids
-  come from `spec/capabilities.json` and are validated at emit time via the
+  come from `schema/capabilities.json` and are validated at emit time via the
   adapter in `tools/capabilities_adapter.sh`.
 - **Helpers:** Shared utilities live under `lib/` (for example
   `lib/portable_realpath.sh`). Source only the helpers you need instead of
@@ -47,7 +49,7 @@ built, how the harness runs them, and how their results are captured.
 ## What a probe emits
 
 Every probe emits one [boundary object](boundary_object.md) that conforms to
-`schema/boundary_object_cfbo_v1.json`. Required data includes:
+`schema/boundary_object.json`. Required data includes:
 
 - Probe identity (`probe.id`, `probe.version`,
   `probe.primary_capability_id`, `probe.secondary_capability_ids`).
@@ -88,6 +90,3 @@ The fast authoring loop favors single-probe runs:
   before sending patches or running `make matrix`.
 - `make validate-capabilities` checks that every probe, fixture, and stored
   boundary object references real capability ids.
-
-See `AGENTS.md` for the full Probe Author workflow and contribution
-expectations, and `README.md` for how probes fit into the broader harness.

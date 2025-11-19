@@ -1,10 +1,10 @@
 ## Probe Author contract
 
 As the Probe Author, you:
-- Use the capability catalog in `spec/capabilities.json` to select accurate
+- Use the capability catalog in `schema/capabilities.json` to select accurate
   `primary_capability_id` values. `bin/emit-record` validates IDs, so use the
   exact slugs defined in that file.
-- Read `schema/boundary_object_cfbo_v1.json` alongside
+- Read `schema/boundary_object.json` alongside
   `docs/boundary_object.md` to understand every field the probe must provide.
 - Review existing probes under `probes/` to see which behaviors already have
   coverage and how outcomes are classified. The mapping is mirrored in

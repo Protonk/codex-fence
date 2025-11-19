@@ -138,7 +138,7 @@ require_capability_id() {
     fi
   done
   if [[ ${found} -ne 0 ]]; then
-    echo "Unknown ${label}: ${value}. Expected one of the IDs in spec/capabilities.json." >&2
+    echo "Unknown ${label}: ${value}. Expected one of the IDs in schema/capabilities.json." >&2
     exit 1
   fi
 }
@@ -150,9 +150,9 @@ if [[ ${#secondary_capability_ids[@]} -gt 0 ]]; then
   done
 fi
 
-capabilities_schema_version=$(jq -r '.schema_version // empty' "${repo_root}/spec/capabilities.json")
+capabilities_schema_version=$(jq -r '.schema_version // empty' "${repo_root}/schema/capabilities.json")
 if [[ -z "${capabilities_schema_version}" ]]; then
-  echo "Unable to determine capabilities schema_version from spec/capabilities.json" >&2
+  echo "Unable to determine capabilities schema_version from schema/capabilities.json" >&2
   exit 1
 fi
 

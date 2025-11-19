@@ -35,14 +35,14 @@ part of the default macOS install.
 Probes are tiny Bash scripts that perform one observable action and emit a
 single JSON boundary object describing what happened. Every probe lives directly
 under `probes/<probe_id>.sh` so the filename doubles as the probe id. Probe
-authors work from the capability catalog in `spec/capabilities.json`, reuse helpers from
+authors work from the capability catalog in `schema/capabilities.json`, reuse helpers from
 `lib/` (for example `lib/portable_realpath.sh`), and rely on `bin/emit-record` to enforce the cfbo-v1
 schema. These scripts intentionally avoid non-portable Bash features so they can run
 unchanged on macOS’ `/bin/bash 3.2` and Linux `/usr/bin/env bash`. 
 
-A detailed, human-readable walk-through—including the execution contract,
+An explicit Probe Author contract is in [probes/AGENTS.md](probes/AGENTS.md). A detailed, human-readable walk-through—including the execution contract,
 shared helpers, and how `bin/fence-run` orchestrates modes—lives in
-[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary_object_cfbo_v1.json](schema/boundary_object_cfbo_v1.json) and is described in more detail with examples in [docs/boundary_object.md](docs/boundary_object.md).
+[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary_object.json](schema/boundary_object.json) and is described in more detail with examples in [docs/boundary_object.md](docs/boundary_object.md).
 
 ## Usage
 

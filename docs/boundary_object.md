@@ -10,25 +10,25 @@ Each boundary object captures *one* probe execution in one run mode. Probes are 
 4. Call `bin/emit-record` once with `--run-mode "$FENCE_RUN_MODE"` plus the metadata described below.
 5. Exit with status `0` after emitting JSON. They must not print anything else to stdout; use stderr only for debugging.
 
-See `AGENTS.md` for the workflow details expected from probe authors.
+See `probes/AGENTS.md` for the workflow details expected from probe authors.
 
 ## Formal commitments
 
 The project commits to the cfbo-v1 contract as specified by:
 
-- The machine-readable JSON schema at `schema/boundary_object_cfbo_v1.json`.
+- The machine-readable JSON schema at `schema/boundary_object.json`.
 - This document’s field-by-field explanations.
 
 Within cfbo-v1, the required fields, field names, and semantics described below are stable. Changes that break compatibility (renaming fields, relaxing/adding required fields, or altering meanings) require creating a new schema version and updating this document to match.
 
 ## Boundary object layout (cfbo-v1)
 
-The machine-readable definition lives in `schema/boundary_object_cfbo_v1.json` and is enforced by `bin/emit-record`.
+The machine-readable definition lives in `schema/boundary_object.json` and is enforced by `bin/emit-record`.
 
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `spec/capabilities.json` that was loaded via the adapter (currently `3`). |
+| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` that was loaded via the adapter (currently `3`). |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command, timestamp). |
@@ -61,7 +61,7 @@ Probe identity stays explicit and tied to the capability catalog.
 | `primary_capability_id` | yes | Capability tested by this probe. Must match the adapter output. |
 | `secondary_capability_ids` | yes | Zero or more supporting capability ids (unique, may be empty). |
 
-`bin/emit-record` validates capability IDs by piping `spec/capabilities.json` through `tools/capabilities_adapter.sh`. Add or update IDs there first.
+`bin/emit-record` validates capability IDs by piping `schema/capabilities.json` through `tools/capabilities_adapter.sh`. Add or update IDs there first.
 
 ### `run`
 
