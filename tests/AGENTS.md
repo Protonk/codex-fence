@@ -58,6 +58,7 @@ silent on success, and deterministic.
 | `second_tier/boundary_object_schema.sh` | Runs `bin/emit-record` with a fixture payload and validates the resulting JSON with `jq`. | Extend the jq expression whenever schema/boundary_object.json grows. |
 | `second_tier/harness_smoke.sh` | Runs the fixture probe via `bin/fence-run baseline` and checks the returned boundary object. | Keeps the baseline path honest; extend if fixtures gain new fields. |
 | `second_tier/baseline_no_codex_smoke.sh` | Temporarily hides the Codex CLI from `PATH` and asserts baseline runs still succeed while codex modes fail. | Make sure new smoke fixtures do not depend on `codex`. |
+| `second_tier/probe_resolution_guards.sh` | Attempts to run `bin/fence-run` against paths/symlinks outside `probes/` and expects hard failures. | Use as a template for future negative guard-rail tests. |
 
 Add any heavier “whole repo” validation here. Follow the same structure: source
 `tests/library/utils.sh`, short-circuit on missing prerequisites, and print
@@ -75,6 +76,10 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
 - **New suites:** Put them under `tests/second_tier/` and add the filename (minus
   `.sh`) to the `second_tier_suites` array in `tests/run.sh` so the orchestration
   picks them up.
+- **Negative harness tests:** When adding guard rails (path canonicalization,
+  workspace boundaries, etc.), follow the pattern used in
+  `second_tier/probe_resolution_guards.sh` to assert that failure modes remain
+  enforced.
 
 ## When things fail
 

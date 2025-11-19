@@ -117,6 +117,7 @@ second_tier_suites=(
   "boundary_object_schema"
   "harness_smoke"
   "baseline_no_codex_smoke"
+  "probe_resolution_guards"
 )
 # Suites intentionally run in deterministic order so troubleshooting output is stable.
 

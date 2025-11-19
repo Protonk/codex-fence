@@ -29,11 +29,12 @@ trap 'rm -f "${probe_path}" "${output_tmp}"' EXIT
 
 bin/fence-run baseline "${fixture_name}" > "${output_tmp}"
 
-jq -e '
+jq -e --arg expected_workspace "${REPO_ROOT}" '
   .probe.id == "tests_fixture_probe" and
   .operation.category == "fs" and
   .result.observed_result == "success" and
-  (.payload.raw.probe == "fixture")
+  (.payload.raw.probe == "fixture") and
+  (.run.workspace_root == $expected_workspace)
 ' "${output_tmp}" >/dev/null
 # The jq filter encodes the "happy path" contract the harness should honor.
 

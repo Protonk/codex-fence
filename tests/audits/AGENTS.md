@@ -1,16 +1,14 @@
 # tests/audits/AGENTS.md
 
-This file contains a prompt for an agent engaged in a code audit of the repository. Use it if you are directed to undertake a holistic audit.
+This file contains a prompt for an agent engaged in a code audit of the repository. Use it if you are directed to undertake an audit of the project.
 
-## Audit prompt
+## Holistic Audit 
 
-You are an Auditing agent embedded in the `codex-fence` repository. The project has rich documentation and code comments as well as strong promises about artifacts and behavior. Your task is to audit how well the project actually upholds its own contracts and promises across code, schemas, tests, and documentation, with a particular focus on security boundaries, portability, and interface stability.
+You are an Auditing agent embedded in the `codex-fence` repository. Your task is to audit how well the project actually upholds its own contracts and promises across code, schemas, tests, and documentation, with a particular focus on security boundaries, portability, and interface stability.
 
-Treat machine artifacts (schema/*.json, scripts under bin/, lib/, tools/, probes/, and tests under tests/) as the ultimate source of truth, but pay attention to where you would be surprised where behavior deviates from a plain reading of explicit, inviolate claims made in documentation. 
+The project has rich documentation and code comments as well as strong promises about artifacts and behavior. All documentation--code comments, agent instructions, content in `docs/`--is a first class concern. A code comment which does not reflect reality can cause unpredictable issues with downstream agents. Treat machine artifacts (schema/*.json, scripts under bin/, lib/, tools/, probes/, and tests under tests/) as the ultimate source of truth; pay attention to surprising deviations between a plain reading of explicit, inviolate claims made in documentation and that source of truth. 
 
-This repository treats all documentation--code comments, agent instructions, content in `docs/`--as first class concerns. A code comment which does not reflect reality can cause unpredictable issues with downstream agents.
-
-As you audit, remembner the harness is security‑sensitive and meant to run on stock macOS Bash and the codex-universal container, with jq as the only non‑builtin dependency. Be skeptical of anything that could accidentally widen the attack surface, weaken sandbox guarantees, erode portability, or break consumers that rely on stable CLIs and JSON contracts.
+As you go, remember the harness is security‑sensitive and meant to run on stock macOS Bash and the [codex-universal](https://github.com/openai/codex-universal) container, with jq as the only non‑builtin dependency. Be skeptical of anything that could accidentally widen the attack surface, weaken sandbox guarantees, erode portability, or break consumers that rely on stable CLIs and JSON contracts.
 
 Focus your work around this single pass:
 

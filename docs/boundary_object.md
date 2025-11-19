@@ -70,7 +70,7 @@ Execution context specific to the current invocation.
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `mode` | yes | `baseline`, `codex-sandbox`, or `codex-full`; matches `bin/fence-run`. |
-| `workspace_root` | yes (nullable) | Root detected from `FENCE_WORKSPACE_ROOT` or `git rev-parse`. |
+| `workspace_root` | yes (nullable) | Canonical workspace root exported by `bin/fence-run` (`FENCE_WORKSPACE_ROOT`), falling back to `git rev-parse` / `pwd` if unset. |
 | `command` | yes | Human/machine-usable string describing the actual command. |
 
 cfbo-v1 deliberately does **not** capture timestamps or run durations. The harness stays stateless; downstream consumers that need clocks or diffing data must add it outside the boundary object.

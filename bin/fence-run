@@ -21,7 +21,12 @@ fi
 # shellcheck source=../lib/portable_realpath.sh
 source "${portable_realpath_lib}"
 
-# Resolve a user-supplied probe identifier to a script under repo_root/probes.
+workspace_root=$(portable_realpath "${repo_root}")
+if [[ -z "${workspace_root}" ]]; then
+  workspace_root="${repo_root}"
+fi
+
+# Resolve a user-supplied probe identifier to a script under workspace_root/probes.
 resolve_probe_script_path() {
   local repo="$1"
   local identifier="$2"
@@ -55,7 +60,7 @@ resolve_probe_script_path() {
 }
 mode="$1"
 probe_name="$2"
-probe_path=$(resolve_probe_script_path "${repo_root}" "${probe_name}" || true)
+probe_path=$(resolve_probe_script_path "${workspace_root}" "${probe_name}" || true)
 
 # Protect against typos early so callers see a friendly error.
 if [[ -z "${probe_path}" ]]; then
@@ -129,4 +134,4 @@ case "${mode}" in
 esac
 
 # Export the mode details in env vars so downstream scripts understand context.
-FENCE_RUN_MODE="${mode}" FENCE_SANDBOX_MODE="${sandbox_mode}" "${run_cmd[@]}"
+FENCE_RUN_MODE="${mode}" FENCE_SANDBOX_MODE="${sandbox_mode}" FENCE_WORKSPACE_ROOT="${workspace_root}" "${run_cmd[@]}"

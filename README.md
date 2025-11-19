@@ -102,12 +102,14 @@ any subdirectory.
 
 - POSIX shell utilities + `bash 3.2`
 - `jq`
+- `python3` (falls back to `python`, then `perl`, for the portable path helpers)
 - `make`
 - The `codex` CLI (only if you plan to exercise Codex modes)
 
 The goal is to limit probe noise by keeping things lightweight and compatible
-with the toolchain shipped in macOS. `jq` is the only dependency that is not
-part of the default macOS install.
+with the toolchain shipped in macOS. Stock macOS + the `codex-universal`
+container already ship Python (and Perl), so the only additional dependency to
+install manually is `jq`.
 
 ## Usage
 
