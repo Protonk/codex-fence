@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Keeps docs/capabilities_coverage.json, the capability adapter, and probe
+# Keeps schema/capabilities_coverage.json, the capability adapter, and probe
 # metadata in sync. This prevents drift between human guidance and executable
 # probes.
 # -----------------------------------------------------------------------------
@@ -69,12 +69,12 @@ while IFS=$'\t' read -r cap_id has_probe probe_list; do
     status=1
   fi
 
-done < <(jq -r 'to_entries[] | [.key, (.value.has_probe|tostring), (.value.probe_ids|join(","))] | @tsv' docs/capabilities_coverage.json)
+done < <(jq -r 'to_entries[] | [.key, (.value.has_probe|tostring), (.value.probe_ids|join(","))] | @tsv' schema/capabilities_coverage.json)
 # Each coverage entry includes whether a probe exists plus the explicit list for readability.
 
 for cap in "${capability_ids[@]}"; do
   if ! list_contains "${cap}" "${coverage_cap_ids[@]}"; then
-    echo "  [FAIL] capability_map_sync: docs/capabilities_coverage.json missing entry for '${cap}'" >&2
+    echo "  [FAIL] capability_map_sync: schema/capabilities_coverage.json missing entry for '${cap}'" >&2
     status=1
   fi
 

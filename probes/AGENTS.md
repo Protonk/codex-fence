@@ -12,7 +12,7 @@ As the Probe Author, you:
   `docs/boundary_object.md` to understand every field the probe must provide.
 - Review existing probes under `probes/` to see which behaviors already have
   coverage and how outcomes are classified. The mapping is mirrored in
-  `docs/capabilities_coverage.json`.
+  `schema/capabilities_coverage.json`.
 - Keep a tight edit/test loop. While iterating on a script, run
   `tests/probe_contract/light_lint.sh probes/<id>.sh` to lint the probe in
   isolation, then `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`)
