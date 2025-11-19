@@ -21,7 +21,7 @@ Prefer to add probes that:
 Keep each probe:
 - Small and single-purpose. When you need reusable helpers (portable
   realpath/relpath, metadata extraction, JSON parsing), source
-  `lib/helpers.sh` or other shared helpers instead of duplicating
+  the helper scripts in `lib/` (for example `lib/portable_realpath.sh`) instead of duplicating
   interpreter detection. Helpers stay pure so probes remain focused.
 - Clearly labeled with `primary_capability_id`. Choose the best match from the
   catalog and optionally list related capabilities in

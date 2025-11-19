@@ -28,8 +28,9 @@ valuable.
 
 ### Helpers and tooling
 
-- Probe helpers live in `lib/helpers.sh`. Keep functions pure (no global state
-  or side effects) so probes and tests can source them safely.
+- Probe helpers live under `lib/` (one function per script, e.g.,
+  `lib/portable_realpath.sh`). Keep helpers pure (no global state or side
+  effects) so probes and tests can source them safely.
 - Project-level scripts (lint, validation, adapters) live under `tools/`.
   `tools/light_lint.sh` is the shared lint entry point—prefer extending it for
   new checks instead of duplicating logic elsewhere.

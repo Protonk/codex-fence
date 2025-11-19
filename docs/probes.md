@@ -21,8 +21,8 @@ built, how the harness runs them, and how their results are captured.
   `primary_capability_id` (with optional `secondary_capability_ids`). The ids
   come from `spec/capabilities.json` and are validated at emit time via the
   adapter in `tools/capabilities_adapter.sh`.
-- **Helpers:** Shared utilities live in `lib/helpers.sh`
-  (portable path helpers, probe metadata extraction, etc.). Source this file
+- **Helpers:** Shared utilities live under `lib/` (for example
+  `lib/portable_realpath.sh`). Source only the helpers you need instead of
   when needed instead of re-implementing interpreter detection. Helpers are
   pure and portable so probes stay single-purpose.
 

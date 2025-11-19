@@ -36,7 +36,7 @@ Probes are tiny Bash scripts that perform one observable action and emit a
 single JSON boundary object describing what happened. Every probe lives directly
 under `probes/<probe_id>.sh` so the filename doubles as the probe id. Probe
 authors work from the capability catalog in `spec/capabilities.json`, reuse helpers from
-`lib/helpers.sh`, and rely on `bin/emit-record` to enforce the cfbo-v1
+`lib/` (for example `lib/portable_realpath.sh`), and rely on `bin/emit-record` to enforce the cfbo-v1
 schema. These scripts intentionally avoid non-portable Bash features so they can run
 unchanged on macOS’ `/bin/bash 3.2` and Linux `/usr/bin/env bash`. 
 
