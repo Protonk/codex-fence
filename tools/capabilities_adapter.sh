@@ -55,13 +55,13 @@ else
       ($cap.operations | to_object) as $ops |
       if ($cap.id // "") == "" then
         error("capabilities_adapter: encountered capability with no id")
+      elif has($cap.id) then
+        error("capabilities_adapter: duplicate capability id \($cap.id)")
       else
         .[$cap.id] = {
           id: $cap.id,
           category: ($cap.category // null),
           layer: ($cap.layer // null),
-          status: ($cap.status // null),
-          level: ($cap.level // null),
           description: ($cap.description // null),
           notes: ($cap.notes // null),
           operations: {

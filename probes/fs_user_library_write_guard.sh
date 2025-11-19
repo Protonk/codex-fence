@@ -80,6 +80,19 @@ else
   if [[ -e "${target_file}" ]]; then
     target_exists_after="true"
   fi
+
+  # Remove probe-created files so repeated runs do not leave artifacts behind.
+  if [[ "${status}" == "success" && "${existed_before}" != "true" ]]; then
+    if rm -f "${target_file}" 2>/dev/null; then
+      target_exists_after="false"
+    else
+      if [[ -e "${target_file}" ]]; then
+        target_exists_after="true"
+      else
+        target_exists_after="false"
+      fi
+    fi
+  fi
 fi
 
 truncate() {

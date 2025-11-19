@@ -13,12 +13,19 @@ fi
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
+portable_realpath_lib="${repo_root}/lib/portable_realpath.sh"
+if [[ ! -f "${portable_realpath_lib}" ]]; then
+  echo "portable_realpath helper not found at ${portable_realpath_lib}" >&2
+  exit 1
+fi
+# shellcheck source=../lib/portable_realpath.sh
+source "${portable_realpath_lib}"
 
 # Resolve a user-supplied probe identifier to a script under repo_root/probes.
 resolve_probe_script_path() {
   local repo="$1"
   local identifier="$2"
-  local attempts=() candidate trimmed
+  local attempts=() candidate trimmed canonical_path
   if [[ -z "${identifier}" ]]; then
     return 1
   fi
@@ -36,14 +43,16 @@ resolve_probe_script_path() {
     fi
   fi
   for candidate in "${attempts[@]}"; do
-    if [[ -f "${candidate}" && "${candidate}" == "${repo}/probes/"* ]]; then
-      printf '%s\n' "${candidate}"
-      return 0
+    if [[ -f "${candidate}" ]]; then
+      canonical_path=$(portable_realpath "${candidate}")
+      if [[ -n "${canonical_path}" && "${canonical_path}" == "${repo}/probes/"* ]]; then
+        printf '%s\n' "${canonical_path}"
+        return 0
+      fi
     fi
   done
   return 1
 }
-
 mode="$1"
 probe_name="$2"
 probe_path=$(resolve_probe_script_path "${repo_root}" "${probe_name}" || true)
@@ -100,9 +109,21 @@ case "${mode}" in
     esac
     ;;
   codex-full)
+    sandbox_requires_codex
     sandbox_mode="danger-full-access"
-    # TODO: wire up dedicated codex profile that disables sandboxing entirely.
-    run_cmd=("${probe_path}")
+    platform=$(uname -s)
+    case "${platform}" in
+      Darwin)
+        run_cmd=(codex --dangerously-bypass-approvals-and-sandbox sandbox macos -- "${probe_path}")
+        ;;
+      Linux)
+        run_cmd=(codex --dangerously-bypass-approvals-and-sandbox sandbox linux -- "${probe_path}")
+        ;;
+      *)
+        echo "Unsupported platform for codex-full: ${platform}" >&2
+        exit 1
+        ;;
+    esac
     ;;
   *)
     echo "Unknown mode: ${mode}" >&2

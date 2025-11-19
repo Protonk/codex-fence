@@ -21,8 +21,8 @@
       "const": "cfbo-v1"
     },
     "capabilities_schema_version": {
-      "description": "The schema_version value from schema/capabilities.json used when interpreting capability ids (e.g., 3).",
-      "type": ["integer", "null"]
+      "description": "The schema_version value from schema/capabilities.json used when interpreting capability ids (e.g., 3, \"3.1\", \"2024-05-01\").",
+      "type": ["integer", "string", "null"]
     },
     "stack": {
       "type": "object",

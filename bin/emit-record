@@ -167,12 +167,19 @@ if [[ -z "${capabilities_schema_version}" ]]; then
   echo "Unable to determine capabilities schema_version from schema/capabilities.json" >&2
   exit 1
 fi
+capabilities_schema_version_json=$(jq -cn --arg value "${capabilities_schema_version}" '
+  if ($value | length) == 0 then
+    null
+  else
+    (try ($value | tonumber) catch $value)
+  end
+')
 
 # Capture the full metadata for each capability attached to this record.
 capability_snapshot() {
   local cap_id="$1"
   local snapshot
-  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, layer, status, level}' <<<"${capabilities_json}")
+  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, layer}' <<<"${capabilities_json}")
   if [[ -z "${snapshot}" || "${snapshot}" == "null" ]]; then
     echo "Unable to resolve capability metadata for ${cap_id}" >&2
     exit 1
@@ -290,10 +297,10 @@ jq -n \
   --argjson result "${result_json}" \
   --argjson payload "${payload_json}" \
   --argjson capability_context "${capability_context}" \
-  --arg capabilities_schema_version "${capabilities_schema_version}" \
+  --argjson capabilities_schema_version "${capabilities_schema_version_json}" \
   '{
     schema_version: $schema_version,
-    capabilities_schema_version: (($capabilities_schema_version | tonumber) // null),
+    capabilities_schema_version: $capabilities_schema_version,
     stack: $stack,
     probe: $probe,
     run: $run,

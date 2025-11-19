@@ -61,7 +61,6 @@ The following entry is copied verbatim from `schema/capabilities.json` to show h
   "id": "cap_fs_read_workspace_tree",
   "category": "filesystem",
   "layer": "os_sandbox",
-  "status": "core",
   "description": "Ability for commands to read files anywhere under the Codex workspace root(s).",
   "operations": {
     "allow": [
@@ -79,7 +78,6 @@ The following entry is copied verbatim from `schema/capabilities.json` to show h
   "agent_controls": [
 
   ],
-  "level": "medium",
   "notes": "This is the “normal” mode for Auto / Full access in Codex – agents must be able to read the checked-out project tree, but not arbitrary user directories. Expect to be implemented as allow file-read* (subpath WRITABLE_ROOT_i) for each workspace root, with deny default.\n",
   "sources": [
     {

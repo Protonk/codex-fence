@@ -113,7 +113,7 @@ Matching JSON output (trimmed for brevity):
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": 3,
+  "capabilities_schema_version": "2024-05-01",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",
@@ -149,9 +149,7 @@ Matching JSON output (trimmed for brevity):
     "primary": {
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
-      "layer": "os_sandbox",
-      "status": "core",
-      "level": "high"
+      "layer": "os_sandbox"
     },
     "secondary": []
   },

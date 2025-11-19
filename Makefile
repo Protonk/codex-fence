@@ -6,11 +6,13 @@ SHELL := /bin/bash
 
 # Resolve the set of probe scripts once and expose handy projections:
 # - ALL_PROBE_SCRIPTS: every `probes/*.sh` file on disk
-# - PROBES: names requested by the caller (`make PROBES=foo,bar` or default all)
+# - PROBES: names requested by the caller (`make PROBES=foo,bar` / space-separated, or default all)
 # - PROBE_SCRIPTS: normalized list of scripts we will attempt to run
 # - MISSING_PROBES: any requested probe ids without a matching script
 ALL_PROBE_SCRIPTS := $(sort $(wildcard probes/*.sh))
-PROBES ?= $(patsubst probes/%.sh,%,$(ALL_PROBE_SCRIPTS))
+comma := ,
+PROBES_RAW ?= $(patsubst probes/%.sh,%,$(ALL_PROBE_SCRIPTS))
+PROBES := $(strip $(subst $(comma), ,$(PROBES_RAW)))
 PROBE_SCRIPTS := $(foreach probe,$(PROBES),$(wildcard probes/$(probe).sh))
 MISSING_PROBES := $(filter-out $(patsubst probes/%.sh,%,$(PROBE_SCRIPTS)),$(PROBES))
 

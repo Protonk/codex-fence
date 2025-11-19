@@ -88,8 +88,11 @@ for script in "${probe_scripts[@]}"; do
     errors+=("missing #!/usr/bin/env bash shebang")
   fi
 
-  if ! grep -q 'set -euo pipefail' "${script}"; then
-    errors+=("missing 'set -euo pipefail'")
+  # Enforce that the first non-comment command after the shebang enables strict mode.
+  first_non_comment=$(awk 'NR==1 {next} /^[[:space:]]*#/ {next} /^[[:space:]]*$/ {next} {print; exit}' "${script}")
+  trimmed_first_command=$(printf '%s' "${first_non_comment%%#*}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  if [[ -z "${trimmed_first_command}" || "${trimmed_first_command}" != "set -euo pipefail" ]]; then
+    errors+=("first non-comment line after shebang must be 'set -euo pipefail'")
   fi
 
   if ! bash -n "${script}" >/dev/null 2>&1; then

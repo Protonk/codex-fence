@@ -40,8 +40,9 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
    - `codex-sandbox` shells out through `codex sandbox …` so the probe runs
      inside the seatbelt profile the CLI configures for the current platform.
      (Requires the Codex CLI in `PATH`.)
-   - `codex-full` currently runs the probe directly but is reserved for future
-     modes where Codex disables sandboxing entirely.
+   - `codex-full` shells out through the Codex CLI with the
+     `--dangerously-bypass-approvals-and-sandbox` flag so that the probe runs
+     under Codex’s unsandboxed profile. (Requires the Codex CLI in `PATH`.)
 3. **Result capture** – the probe prints one JSON boundary object to stdout.
    `make matrix` stores each run as `out/<probe>.<mode>.json` so you can diff
    runs across modes, CLI versions, or host machines.

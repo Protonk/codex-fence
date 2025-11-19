@@ -43,6 +43,10 @@ bin/emit-record \
 
 jq -e '
   .schema_version == "cfbo-v1" and
+  (has("capabilities_schema_version") and
+    ((.capabilities_schema_version | type) as $csv_type |
+      ($csv_type == "string" or $csv_type == "number" or $csv_type == "null"))
+  ) and
   (.stack | type == "object") and
   (.probe.id == "schema_test_fixture" and
    .probe.version == "1" and
@@ -53,8 +57,17 @@ jq -e '
   (.operation.category == "fs" and .operation.verb == "read" and .operation.target == "/dev/null" and (.operation.args | type == "object")) and
   (.result.observed_result == "success" or .result.observed_result == "denied" or .result.observed_result == "partial" or .result.observed_result == "error") and
   (.result | has("raw_exit_code") and has("errno") and has("message") and has("duration_ms") and has("error_detail")) and
-  (.payload.stdout_snippet == "fixture-stdout" and .payload.stderr_snippet == "fixture-stderr" and (.payload.raw | type == "object"))
+  (.payload.stdout_snippet == "fixture-stdout" and .payload.stderr_snippet == "fixture-stderr" and (.payload.raw | type == "object")) and
+  (.capability_context | type == "object") and
+  (.capability_context | has("primary") and has("secondary")) and
+  (.capability_context.primary.id == "cap_fs_read_workspace_tree") and
+  (.capability_context.primary | has("category") and has("layer")) and
+  (.capability_context.secondary | type == "array")
 ' "${record_tmp}" >/dev/null
 # jq -e exits non-zero if any invariant fails, propagating failure to the suite.
+
+python3 "${REPO_ROOT}/tests/library/json_schema_validator.py" \
+  "${REPO_ROOT}/schema/boundary_object.json" \
+  "${record_tmp}"
 
 echo "boundary_object_schema: PASS"

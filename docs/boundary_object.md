@@ -28,7 +28,7 @@ The machine-readable definition lives in `schema/boundary_object.json` and is en
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` that was loaded via the adapter (currently `3`). |
+| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` that was loaded via the adapter (emitted as a string or integer such as `3`, `"3.1"`, or `"2024-05-01"`). |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command, timestamp). |
@@ -121,7 +121,7 @@ Every record includes the capability snapshot(s) that were resolved when the pro
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `primary` | yes | Object with `id`, `category`, `layer`, `status`, `level` from the adapter. |
+| `primary` | yes | Object with `id`, `category`, `layer` from the adapter. |
 | `secondary` | no | Array of the same structure (may be empty). |
 
 ## Example
@@ -131,7 +131,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": 3,
+  "capabilities_schema_version": "2024-05-01",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",
@@ -167,9 +167,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
     "primary": {
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
-      "layer": "os_sandbox",
-      "status": "core",
-      "level": "high"
+      "layer": "os_sandbox"
     },
     "secondary": []
   },
