@@ -167,13 +167,11 @@ if [[ -z "${capabilities_schema_version}" ]]; then
   echo "Unable to determine capabilities schema_version from schema/capabilities.json" >&2
   exit 1
 fi
-capabilities_schema_version_json=$(jq -cn --arg value "${capabilities_schema_version}" '
-  if ($value | length) == 0 then
-    null
-  else
-    (try ($value | tonumber) catch $value)
-  end
-')
+if [[ ! "${capabilities_schema_version}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+  echo "Invalid capabilities schema_version: ${capabilities_schema_version}. Expected an alphanumeric string without spaces." >&2
+  exit 1
+fi
+capabilities_schema_version_json=$(jq -cn --arg value "${capabilities_schema_version}" '$value')
 
 # Capture the full metadata for each capability attached to this record.
 capability_snapshot() {

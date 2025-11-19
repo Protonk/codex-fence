@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": "macOS_codex_v1",
   "scope": {
     "description": "Known macOS sandbox policy surface facing a Codex agent",
     "notes": "This catalog models the effective sandbox surface that Codex agents see on macOS, focusing on behaviors that can be observed and probed from the codex-fence harness. It is not a complete Seatbelt reference and is expected to evolve over time.\n",

@@ -28,7 +28,7 @@ The machine-readable definition lives in `schema/boundary_object.json` and is en
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` that was loaded via the adapter (emitted as a string or integer such as `3`, `"3.1"`, or `"2024-05-01"`). |
+| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` resolved via the adapter. It is a string with no whitespace such as `macOS_codex_v1`; `null` is reserved for situations where the schema cannot be determined. |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command). This harness intentionally omits timestamps so records stay stateless. |
@@ -132,7 +132,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": "2024-05-01",
+  "capabilities_schema_version": "macOS_codex_v1",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",

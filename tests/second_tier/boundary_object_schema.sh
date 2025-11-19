@@ -44,8 +44,13 @@ bin/emit-record \
 jq -e '
   .schema_version == "cfbo-v1" and
   (has("capabilities_schema_version") and
-    ((.capabilities_schema_version | type) as $csv_type |
-      ($csv_type == "string" or $csv_type == "number" or $csv_type == "null"))
+    (
+      .capabilities_schema_version == null or
+      (
+        (.capabilities_schema_version | type) == "string" and
+        (.capabilities_schema_version | test("^[A-Za-z0-9_.-]+$"))
+      )
+    )
   ) and
   (.stack | type == "object") and
   (.probe.id == "schema_test_fixture" and

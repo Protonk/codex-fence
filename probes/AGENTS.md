@@ -115,7 +115,7 @@ Matching JSON output (trimmed for brevity):
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": "2024-05-01",
+  "capabilities_schema_version": "macOS_codex_v1",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",

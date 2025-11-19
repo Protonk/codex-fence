@@ -11,6 +11,7 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
+expected_schema_version="macOS_codex_v1"
 
 # Allow callers to override the default schema path (useful for tests).
 capabilities_file="${1:-${repo_root}/schema/capabilities.json}"
@@ -46,8 +47,12 @@ def normalize_sources:
       url_hint: (.url_hint // null)
     } | with_entries(select(.value != null)));
 
-if .schema_version != 3 then
-  error("capabilities_adapter: expected schema_version=3, got \(.schema_version)")
+if (.schema_version | type) != "string" then
+  error("capabilities_adapter: expected schema_version to be a string, got \(.schema_version|type)")
+elif (.schema_version | test("^[A-Za-z0-9_.-]+$") | not) then
+  error("capabilities_adapter: schema_version must match ^[A-Za-z0-9_.-]+$, got \(.schema_version)")
+elif .schema_version != $expected_version then
+  error("capabilities_adapter: expected schema_version=\($expected_version), got \(.schema_version)")
 else
   (.capabilities // [])
   | reduce .[] as $cap (
@@ -77,4 +82,4 @@ else
 end
 JQ
 
-jq -e -S "${jq_program}" "${capabilities_file}"
+jq -e -S --arg expected_version "${expected_schema_version}" "${jq_program}" "${capabilities_file}"
