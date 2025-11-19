@@ -1,15 +1,13 @@
 SHELL := /bin/bash
-PROBE_MANIFEST_JSON := tmp/probes_manifest.json
-PROBE_MANIFEST_MK := tmp/probes_manifest.mk
-PROBE_MANIFEST_DEPS := $(shell find probes -type f -name '*.sh' -print)
 
-$(PROBE_MANIFEST_JSON) $(PROBE_MANIFEST_MK): $(PROBE_MANIFEST_DEPS)
-	ruby tools/generate_probe_manifest.rb --json $(PROBE_MANIFEST_JSON) --make $(PROBE_MANIFEST_MK)
+ALL_PROBE_SCRIPTS := $(sort $(wildcard probes/*.sh))
+PROBES ?= $(patsubst probes/%.sh,%,$(ALL_PROBE_SCRIPTS))
+PROBE_SCRIPTS := $(foreach probe,$(PROBES),$(wildcard probes/$(probe).sh))
+MISSING_PROBES := $(filter-out $(patsubst probes/%.sh,%,$(PROBE_SCRIPTS)),$(PROBES))
 
--include $(PROBE_MANIFEST_MK)
-
-PROBE_SCRIPTS ?=
-PROBES ?=
+ifneq ($(strip $(MISSING_PROBES)),)
+$(error Missing probe scripts: $(MISSING_PROBES))
+endif
 OUTDIR := out
 PROBE ?=
 

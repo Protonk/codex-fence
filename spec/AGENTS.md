@@ -1,10 +1,12 @@
 # Capability Catalog Guide 
 
-This document summarizes the structure of `capabilities.yaml` so that humans and agents can quickly see what kinds of capabilities are modeled and decide whether to inspect the full catalog.
+This document summarizes the structure of `capabilities.json` so that humans and agents can quickly see what kinds of capabilities are modeled and decide whether to inspect the full catalog.
 
 > NOTE: This document exists to help agents understand the structure of the catalog, NOT to provide additional technical or policy information.
 
-Read this document to see how each field in `capabilities.yaml` is structured and interpreted, and how capability entries connect to probes and supporting references.  
+Read this document to see how each field in `capabilities.json` is structured and interpreted, and how capability entries connect to probes and supporting references.  
+
+`capabilities.json` begins with the "`schema_version`" which is **3**.
 
 ## Catalog scope and shared references
 
@@ -46,7 +48,7 @@ Total capabilities: **22**
 | `sandbox_profile`      | `os_sandbox`    | Profile structure, logging, and parameterization features.                                 | 3                |
 | `agent_sandbox_policy` | `agent_runtime` | Session-level approvals, trust lists, sandbox env markers, and default sandboxing behavior.| 4                |
 
-Capability counts in this guide are descriptive; `capabilities.yaml` is the source of truth.
+Capability counts in this guide are descriptive; `capabilities.json` is the source of truth.
 
 ---
 

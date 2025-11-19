@@ -1,7 +1,7 @@
 ## Probe Author contract
 
 As the Probe Author, you:
-- Use the capability catalog in `spec/capabilities.yaml` to select accurate
+- Use the capability catalog in `spec/capabilities.json` to select accurate
   `primary_capability_id` values. `bin/emit-record` validates IDs, so use the
   exact slugs defined in that file.
 - Read `schema/boundary_object_cfbo_v1.json` alongside
@@ -20,8 +20,8 @@ Prefer to add probes that:
 
 Keep each probe:
 - Small and single-purpose. When you need reusable helpers (portable
-  realpath/relpath, metadata extraction, YAML parsing), source
-  `tools/lib/helpers.sh` or other shared helpers instead of duplicating
+  realpath/relpath, metadata extraction, JSON parsing), source
+  `lib/helpers.sh` or other shared helpers instead of duplicating
   interpreter detection. Helpers stay pure so probes remain focused.
 - Clearly labeled with `primary_capability_id`. Choose the best match from the
   catalog and optionally list related capabilities in
@@ -38,24 +38,6 @@ their `probe.id` (for example, `probes/fs_outside_workspace.sh`). This flat
 layout eliminates role- and category-specific subdirectories—every script is
 just a probe. Keep capability metadata accurate so downstream tooling can reason
 about coverage without depending on directory names.
-
-## Probe manifest and runner API
-
-`tools/generate_probe_manifest.rb` materializes probe metadata into
-`tmp/probes_manifest.json` (plus a Makefile fragment). This keeps `make matrix`
-from re-discovering the tree every time and provides a single source of truth
-for downstream tooling. The manifest records each probe’s id, path, capability
-ids, checksum, and whether it opts into the module runner API.
-
-`bin/probe-runner` is the new execution harness for module probes. You opt in by
-adding `# probe_runner_api: module` near the top of the script and defining a
-`run_probe` function that calls `emit_result …` (provided by
-`tools/lib/probe_runner_module.sh`) exactly once. `emit_result` accepts the same
-flags you would normally pass to `bin/emit-record` (`--status`, `--command`,
-`--category`, `--verb`, `--target`, `--payload-file`, etc.). The runner merges
-those arguments with the manifest metadata and invokes `bin/emit-record` for
-you, so the script stays focused on the observable behavior. Legacy probes keep
-running as standalone scripts until they migrate.
 
 ## Probe description and agent guidance (cfbo-v1)
 
@@ -125,7 +107,7 @@ Matching JSON output (trimmed for brevity):
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": 2,
+  "capabilities_schema_version": 3,
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",
@@ -161,8 +143,9 @@ Matching JSON output (trimmed for brevity):
     "primary": {
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
-      "platform": ["macos"],
-      "layer": "os_sandbox"
+      "layer": "os_sandbox",
+      "status": "core",
+      "level": "high"
     },
     "secondary": []
   },

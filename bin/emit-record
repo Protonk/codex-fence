@@ -138,7 +138,7 @@ require_capability_id() {
     fi
   done
   if [[ ${found} -ne 0 ]]; then
-    echo "Unknown ${label}: ${value}. Expected one of the IDs in spec/capabilities.yaml." >&2
+    echo "Unknown ${label}: ${value}. Expected one of the IDs in spec/capabilities.json." >&2
     exit 1
   fi
 }
@@ -150,16 +150,16 @@ if [[ ${#secondary_capability_ids[@]} -gt 0 ]]; then
   done
 fi
 
-capabilities_schema_version=$(ruby -I"${repo_root}/tools/lib" -rruby_yaml_loader -e 'data = CodexFence::RubyYamlLoader.safe_load_file(ARGV[0]); puts(data["schema_version"] || "")' "${repo_root}/spec/capabilities.yaml")
+capabilities_schema_version=$(jq -r '.schema_version // empty' "${repo_root}/spec/capabilities.json")
 if [[ -z "${capabilities_schema_version}" ]]; then
-  echo "Unable to determine capabilities schema_version from spec/capabilities.yaml" >&2
+  echo "Unable to determine capabilities schema_version from spec/capabilities.json" >&2
   exit 1
 fi
 
 capability_snapshot() {
   local cap_id="$1"
   local snapshot
-  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, platform, layer}' <<<"${capabilities_json}")
+  snapshot=$(jq -c --arg id "${cap_id}" '.[ $id ] // empty | {id, category, layer, status, level}' <<<"${capabilities_json}")
   if [[ -z "${snapshot}" || "${snapshot}" == "null" ]]; then
     echo "Unable to resolve capability metadata for ${cap_id}" >&2
     exit 1

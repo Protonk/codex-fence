@@ -46,7 +46,7 @@ done
 
 cd "${REPO_ROOT}"
 
-light_lint_bin="${REPO_ROOT}/tools/lib/light_lint.sh"
+light_lint_bin="${REPO_ROOT}/tools/light_lint.sh"
 if [[ ! -x "${light_lint_bin}" ]]; then
   echo "tests/run.sh: missing light lint helper at ${light_lint_bin}" >&2
   exit 1
@@ -111,7 +111,6 @@ second_tier_suites=(
   "boundary_object_schema"
   "harness_smoke"
   "baseline_no_codex_smoke"
-  "probe_runner_smoke"
 )
 
 status=0

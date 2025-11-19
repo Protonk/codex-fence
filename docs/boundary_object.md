@@ -28,7 +28,7 @@ The machine-readable definition lives in `schema/boundary_object_cfbo_v1.json` a
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `spec/capabilities.yaml` that was loaded via the adapter (currently `2`). |
+| `capabilities_schema_version` | yes (nullable) | The version from `spec/capabilities.json` that was loaded via the adapter (currently `3`). |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command, timestamp). |
@@ -61,7 +61,7 @@ Probe identity stays explicit and tied to the capability catalog.
 | `primary_capability_id` | yes | Capability tested by this probe. Must match the adapter output. |
 | `secondary_capability_ids` | yes | Zero or more supporting capability ids (unique, may be empty). |
 
-`bin/emit-record` validates capability IDs by piping `spec/capabilities.yaml` through `tools/capabilities_adapter.sh`. Add or update IDs there first.
+`bin/emit-record` validates capability IDs by piping `spec/capabilities.json` through `tools/capabilities_adapter.sh`. Add or update IDs there first.
 
 ### `run`
 
@@ -121,7 +121,7 @@ Every record includes the capability snapshot(s) that were resolved when the pro
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `primary` | yes | Object with `id`, `category`, `platform`, `layer` from the adapter. |
+| `primary` | yes | Object with `id`, `category`, `layer`, `status`, `level` from the adapter. |
 | `secondary` | no | Array of the same structure (may be empty). |
 
 ## Example
@@ -131,7 +131,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
 ```json
 {
   "schema_version": "cfbo-v1",
-  "capabilities_schema_version": 2,
+  "capabilities_schema_version": 3,
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",
@@ -167,8 +167,9 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
     "primary": {
       "id": "cap_fs_write_workspace_tree",
       "category": "filesystem",
-      "platform": ["macos"],
-      "layer": "os_sandbox"
+      "layer": "os_sandbox",
+      "status": "core",
+      "level": "high"
     },
     "secondary": []
   },

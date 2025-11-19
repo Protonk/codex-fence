@@ -4,10 +4,10 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 
-capabilities_file="${1:-${repo_root}/spec/capabilities.yaml}"
+capabilities_file="${1:-${repo_root}/spec/capabilities.json}"
 
 if [[ ! -f "${capabilities_file}" ]]; then
-  echo "capabilities_adapter: unable to find capabilities.yaml at ${capabilities_file}" >&2
+  echo "capabilities_adapter: unable to find capabilities.json at ${capabilities_file}" >&2
   exit 1
 fi
 
@@ -36,8 +36,8 @@ def normalize_sources:
       url_hint: (.url_hint // null)
     } | with_entries(select(.value != null)));
 
-if .schema_version != 2 then
-  error("capabilities_adapter: expected schema_version=2, got \(.schema_version)")
+if .schema_version != 3 then
+  error("capabilities_adapter: expected schema_version=3, got \(.schema_version)")
 else
   (.capabilities // [])
   | reduce .[] as $cap (
@@ -49,8 +49,9 @@ else
         .[$cap.id] = {
           id: $cap.id,
           category: ($cap.category // null),
-          platform: ($cap.platform | to_array),
           layer: ($cap.layer // null),
+          status: ($cap.status // null),
+          level: ($cap.level // null),
           description: ($cap.description // null),
           notes: ($cap.notes // null),
           operations: {
@@ -66,16 +67,4 @@ else
 end
 JQ
 
-ruby -I"${repo_root}/tools/lib" -rjson -rruby_yaml_loader - "${capabilities_file}" <<'RUBY' | jq -S "${jq_program}"
-path = ARGV.fetch(0)
-begin
-  require 'json'
-  require 'ruby_yaml_loader'
-  data = CodexFence::RubyYamlLoader.safe_load_file(path)
-rescue Psych::Exception => e
-  warn "capabilities_adapter: failed to parse #{path}: #{e.message}"
-  exit 1
-end
-
-puts JSON.generate(data)
-RUBY
+jq -e -S "${jq_program}" "${capabilities_file}"

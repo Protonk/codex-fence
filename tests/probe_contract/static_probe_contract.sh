@@ -9,8 +9,8 @@ usage() {
   cat <<'USAGE' >&2
 Usage: tests/probe_contract/static_probe_contract.sh [--probe <probe>]
 
-Without arguments, all probes under probes/ (including nested directories) are
-validated. Use --probe to restrict the run to a single probe id or path.
+Without arguments, all probes under probes/ are validated. Use --probe to
+restrict the run to a single probe id or path.
 USAGE
 }
 

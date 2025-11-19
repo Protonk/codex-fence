@@ -8,13 +8,35 @@ fi
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
-helpers_lib="${repo_root}/tools/lib/helpers.sh"
-if [[ ! -f "${helpers_lib}" ]]; then
-  echo "fence-run: missing helpers library at ${helpers_lib}" >&2
-  exit 1
-fi
-# shellcheck source=tools/lib/helpers.sh
-source "${helpers_lib}"
+
+resolve_probe_script_path() {
+  local repo="$1"
+  local identifier="$2"
+  local attempts=() candidate trimmed
+  if [[ -z "${identifier}" ]]; then
+    return 1
+  fi
+  if [[ "${identifier}" == /* ]]; then
+    attempts+=("${identifier}")
+  else
+    trimmed=${identifier#./}
+    attempts+=("${repo}/${trimmed}")
+    if [[ "${trimmed}" != *.sh ]]; then
+      attempts+=("${repo}/${trimmed}.sh")
+    fi
+    attempts+=("${repo}/probes/${trimmed}")
+    if [[ "${trimmed}" != *.sh ]]; then
+      attempts+=("${repo}/probes/${trimmed}.sh")
+    fi
+  fi
+  for candidate in "${attempts[@]}"; do
+    if [[ -f "${candidate}" && "${candidate}" == "${repo}/probes/"* ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
 
 mode="$1"
 probe_name="$2"

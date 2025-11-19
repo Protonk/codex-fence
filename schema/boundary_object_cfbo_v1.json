@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/Protonk/codex-fence/schema/boundary_object_cfbo_v1.json",
   "title": "Codex Fence Boundary Object (cfbo-v1)",
-  "description": "Record of a single probe execution aligned with the current capability map (capabilities.yaml schema_version=2).",
+  "description": "Record of a single probe execution aligned with the current capability map (spec/capabilities.json schema_version=3).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,7 @@
       "const": "cfbo-v1"
     },
     "capabilities_schema_version": {
-      "description": "The schema_version value from capabilities.yaml used when interpreting capability ids (e.g., 2).",
+      "description": "The schema_version value from spec/capabilities.json used when interpreting capability ids (e.g., 3).",
       "type": ["integer", "null"]
     },
     "stack": {
@@ -155,7 +155,7 @@
     },
     "capability_context": {
       "type": "object",
-      "description": "Snapshot of the primary and secondary capabilities as interpreted from capabilities.yaml v2 at the time of the run.",
+      "description": "Snapshot of the primary and secondary capabilities as interpreted from capabilities.json v3 at the time of the run.",
       "additionalProperties": false,
       "required": ["primary"],
       "properties": {
@@ -175,9 +175,9 @@
   "definitions": {
     "capability_snapshot": {
       "type": "object",
-      "description": "Minimal snapshot of a capability from capabilities.yaml v2 used by this probe.",
+      "description": "Minimal snapshot of a capability from capabilities.json v3 used by this probe.",
       "additionalProperties": false,
-      "required": ["id", "category", "platform", "layer"],
+      "required": ["id", "category", "layer", "status", "level"],
       "properties": {
         "id": {
           "type": "string",
@@ -185,18 +185,19 @@
         },
         "category": {
           "type": "string",
-          "description": "Capability category (e.g., filesystem, process, network, sandbox_meta, agent_policy)."
-        },
-        "platform": {
-          "type": "array",
-          "description": "List of platforms on which this capability definition applies (e.g., [\"macos\"]).",
-          "items": { "type": "string" },
-          "minItems": 1,
-          "uniqueItems": true
+          "description": "Capability category (e.g., filesystem, process, network, sandbox_profile, agent_sandbox_policy)."
         },
         "layer": {
           "type": "string",
-          "description": "Layer at which the capability exists (e.g., os_sandbox, agent_policy)."
+          "description": "Layer at which the capability exists (e.g., os_sandbox, agent_runtime)."
+        },
+        "status": {
+          "type": "string",
+          "description": "Lifecycle tag for the capability entry (e.g., core)."
+        },
+        "level": {
+          "type": "string",
+          "description": "Relative severity/priority of the capability (e.g., low, medium, high)."
         }
       }
     }

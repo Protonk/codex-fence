@@ -28,14 +28,11 @@ valuable.
 
 ### Helpers and tooling
 
-- Shell helpers live in `tools/lib/helpers.sh`. Keep functions pure (no global
-  state or side effects) so probes and tests can source them safely.
-- Lightweight lint lives in `tools/lib/light_lint.sh`. Prefer extending it for
+- Probe helpers live in `lib/helpers.sh`. Keep functions pure (no global state
+  or side effects) so probes and tests can source them safely.
+- Project-level scripts (lint, validation, adapters) live under `tools/`.
+  `tools/light_lint.sh` is the shared lint entry point—prefer extending it for
   new checks instead of duplicating logic elsewhere.
-- Ruby-based utilities (capability adapter, schema helpers) must load YAML
-  through `CodexFence::RubyYamlLoader` (`tools/lib/ruby_yaml_loader.rb`). This
-  wrapper keeps scripts compatible with macOS system Ruby 2.6 and the newer
-  Ruby bundled in CI containers.
 - `bin/emit-record`, `bin/fence-run`, and any new binaries must stay
   dependency-free beyond POSIX + `jq`.
 
@@ -53,7 +50,7 @@ valuable.
 
 ### Documentation and catalogs
 
-- Changing `spec/capabilities.yaml` or `docs/capabilities_coverage.json`
+- Changing `spec/capabilities.json` or `docs/capabilities_coverage.json`
   requires matching updates to `spec/AGENTS.md` plus any references in
   README/AGENTS.
 - Updates to the boundary-object schema (`schema/boundary_object_cfbo_v1.json`)

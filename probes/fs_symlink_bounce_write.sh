@@ -5,8 +5,8 @@ set -euo pipefail
 # before returning to a workspace file. Targets cap_fs_follow_symlinks_out_of_workspace.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
-helpers_lib="${repo_root}/tools/lib/helpers.sh"
-# shellcheck source=tools/lib/helpers.sh
+helpers_lib="${repo_root}/lib/helpers.sh"
+# shellcheck source=lib/helpers.sh
 source "${helpers_lib}"
 
 run_mode="${FENCE_RUN_MODE:-baseline}"
