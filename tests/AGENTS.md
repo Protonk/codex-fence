@@ -1,7 +1,7 @@
-# Tests Directory Guide
+# tests/AGENTS.md
 
 This guide orients agents who need to understand, extend, or debug the harness
-tests. Pair it with `README.md` for high-level project context.
+tests. 
 
 ## Mental model
 
