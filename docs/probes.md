@@ -36,7 +36,9 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
 
 1. **Environment setup** – determines the workspace root, sets the probe id,
    and exports `FENCE_RUN_MODE`, `FENCE_WORKSPACE_ROOT`, plus mode-specific
-   variables such as `FENCE_SANDBOX_MODE`.
+   variables such as `FENCE_SANDBOX_MODE`. Override the exported workspace via
+   `--workspace-root PATH` or by setting `FENCE_WORKSPACE_ROOT`; pass an empty
+   value to defer to `bin/emit-record`’s `git rev-parse`/`pwd` fallback.
 2. **Mode dispatch**
    - `baseline` runs the probe directly with no sandboxing.
    - `codex-sandbox` shells out through `codex sandbox …` so the probe runs
