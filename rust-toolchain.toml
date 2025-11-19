@@ -1,0 +1,6 @@
+[toolchain]
+# Pick a specific stable version once you're happy with it:
+# e.g. "stable-1.82.0" or whatever you're targeting.
+channel = "stable"
+profile = "default"
+components = ["clippy", "rustfmt"]
