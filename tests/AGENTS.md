@@ -3,6 +3,10 @@
 This guide orients agents who need to understand, extend, or debug the harness
 tests. 
 
+## For audits
+
+Agents interested in auditing the repository should stop reading and instead read [tests/audits/AGENTS.md](tests/audits/AGENTS.md). That file contains whole project audit instructions.
+
 ## Mental model
 
 `tests/` enforces that probes and helpers stay portable and in sync with the
