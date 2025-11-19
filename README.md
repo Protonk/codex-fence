@@ -49,23 +49,70 @@ The goal is to limit probe noise by keeping things lightweight and compatible
 with the toolchain shipped in macOS. `jq` is the only dependency that is not
 part of the default macOS install.
 
-## Probes at a glance
+## Capability-to-signal pipeline
 
-Probes are tiny Bash scripts that perform one observable action and emit a
-single JSON boundary object describing what happened. Every probe lives directly
-under `probes/<probe_id>.sh` so the filename doubles as the probe id. Probe
-authors work from the capability catalog in `schema/capabilities.json`, reuse helpers from
-`lib/` (for example `lib/portable_realpath.sh`), and rely on `bin/emit-record` to enforce the cfbo-v1
-schema. These scripts intentionally avoid non-portable Bash features so they can run
-unchanged on macOS’ `/bin/bash 3.2` and Linux `/usr/bin/env bash`. 
+Everything in the repo exists to turn a capability into an auditable signal:
 
-An explicit Probe Author contract is in [probes/AGENTS.md](probes/AGENTS.md). A detailed, human-readable walk-through—including the execution contract,
-shared helpers, and how `bin/fence-run` orchestrates modes—lives in
-[docs/probes.md](docs/probes.md). The boundary-object schema itself exists in [schema/boundary_object.json](schema/boundary_object.json) and is described in more detail with examples in [docs/boundary_object.md](docs/boundary_object.md).
+1. **Catalog** – `schema/capabilities.json` enumerates what we care about (fs,
+   network, process, etc.). `docs/capabilities.md` explains the structure while
+   `tools/capabilities_adapter.sh` keeps every consumer on the same view.
+2. **Probe contract** – A probe under `probes/<probe_id>.sh` binds one
+   capability (`primary_capability_id`) to an observable action. The author
+   follows [probes/AGENTS.md](probes/AGENTS.md), sources helpers from `lib/`,
+   and keeps the script portable Bash.
+3. **Execution** – `bin/fence-run <mode> <probe>` exports the run context and
+   calls the probe. Helpers in `lib/` give probes predictable utilities, while
+   `bin/detect-stack` captures host metadata.
+4. **Record emission** – Probes call `bin/emit-record`, which validates CLI
+   arguments, pulls capability metadata through the adapter, stamps stack info,
+   and serializes a cfbo-v1 document per [docs/boundary_object.md](docs/boundary_object.md).
+5. **Signals** – Each run lands in `out/<probe>.<mode>.json`. Comparing those
+   boundary objects across modes, commits, or hosts shows how the fence behaves
+   in practice.
+
+This pipeline deliberately favors redundancy: machine artifacts (schema,
+adapters, cfbo records) are authoritative while the `AGENTS.md` files and docs
+explain how to work with them.
+
+### Probe anatomy
+
+- **One probe, one action.** Start with `#!/usr/bin/env bash` +
+  `set -euo pipefail`, perform a single operation, and normalize the observed
+  result to `success`, `denied`, `partial`, or `error`.
+- **Helper reuse.** Reach for `lib/*.sh` (portable path helpers, metadata
+  collectors, etc.) before reinventing plumbing. These helpers are pure so they
+  are safe to source from probes and tests alike.
+- **Emit one record.** Build a concise payload, format the actual command you
+  ran, and call `bin/emit-record --run-mode "$FENCE_RUN_MODE" ...` exactly
+  once. stdout must only contain the JSON boundary object.
+- **Document intent.** Reference the chosen capability ID, describe the
+  attempted operation, and keep comments short; downstream agents depend on the
+  metadata rather than prose to reason about coverage.
+
+See [docs/probes.md](docs/probes.md) for a complete walkthrough, including how
+`bin/fence-run` manages modes and how cfbo fields map to probe inputs.
+
+## Repository map
+
+| Path | Role |
+| --- | --- |
+| `probes/` | Executable probe scripts + author contract; each maps capabilities to observations. |
+| `bin/` | Harness entry points (`fence-run`, `emit-record`, `detect-stack`) that bind probes to modes and capture stack data. |
+| `lib/` | Pure Bash helpers available to probes/tests (`portable_realpath`, serialization helpers, etc.). |
+| `tools/` | Capability adapters/validators that keep metadata consistent across scripts and tests. |
+| `schema/` | Machine-readable capability catalog and cfbo schema consumed by bin/tools/tests. |
+| `docs/` | Human-readable explanations of catalogs, probes, and boundary objects; use alongside the schema files. |
+| `tests/` | Library helpers plus fast-tier and second-tier suites run through `tests/run.sh`; see [tests/AGENTS.md](tests/AGENTS.md). |
+| `out/` | Probe boundary objects, one JSON file per `<probe>.<mode>` run, ready for diffing. |
+| `Makefile` | Convenience targets (`matrix`, `test`, `probe`, `validate-capabilities`) that glue the harness together. |
+
+Pair this map with [`AGENTS.md`](AGENTS.md) when you need deeper orientation for
+any subdirectory.
 
 ## Usage
 
-Each probe run produces a "codex fence boundary object" (`cfbo-v1`) following the above schema that the harness stores under `out/`.
+Each probe run produces a cfbo-v1 boundary object captured under `out/`. Use
+these workflows to exercise the harness:
 
 ### Run a single probe
 
@@ -73,46 +120,38 @@ Each probe run produces a "codex fence boundary object" (`cfbo-v1`) following th
 bin/fence-run baseline fs_outside_workspace
 ```
 
-Use `codex-sandbox` or `codex-full` in place of `baseline` to explore other
-fence modes. Codex modes require the `codex` CLI to be installed and available
-in `PATH`.
+Swap `baseline` for `codex-sandbox` or `codex-full` to explore other modes. The
+Codex modes require the `codex` CLI on `PATH`.
 
-### Run every probe across selected modes
+### Sweep probes across modes
 
 ```sh
 make matrix
 ```
 
-The Makefile auto-detects whether the `codex` CLI is available and chooses an
-appropriate default for `MODES`. Override it to restrict or expand coverage:
+The Makefile auto-detects whether the `codex` CLI is available and picks sensible
+defaults for `MODES`. Override it to focus on specific modes:
 
 ```sh
 make matrix MODES="baseline codex-sandbox"
 ```
 
-Each run lands in `out/<probe>.<mode>.json`, making it easy to diff policy
-changes by mode, Codex version, or host OS.
+The resulting `out/<probe>.<mode>.json` files let you diff policy changes by
+mode, Codex version, or host OS.
 
-## Tests
+## Tests and guard rails
 
-Probe development centers on a fast single-probe loop plus a second tier of
-portable validations. The entry point for both is `tests/run.sh`.
+Probe development centers on a tight loop plus repo-wide guard rails:
 
-- Need the full map? See [`tests/AGENTS.md`](tests/AGENTS.md) for a walkthrough
-  of `tests/library`, fixtures, and each suite (including how to add new ones).
+- `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints a single probe
+  and enforces the static contract. Use this while editing.
+- `make test` runs `tests/run.sh` with no arguments, which first lints every
+  probe and then executes the second-tier suites (`capability_map_sync`,
+  `boundary_object_schema`, `harness_smoke`, `baseline_no_codex_smoke`, etc.).
+- `make validate-capabilities` confirms that probes, fixtures, and stored
+  boundary objects only reference cataloged capability IDs.
 
-- `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints just that
-  script and enforces the static probe contract. This is the recommended loop
-  while authoring or editing a probe.
-- `make test` runs `tests/run.sh` with no arguments, which:
-  1. Runs the fast tier (light lint + static probe contract) across every
-     probe script under `probes/`.
-  2. Executes the second tier suites: `capability_map_sync`,
-     `boundary_object_schema`, `harness_smoke`, and `baseline_no_codex_smoke`
-     (which hides `codex` from `PATH` to prove baseline stays portable).
-- `make validate-capabilities` is available any time you need to confirm that
-  probes, fixtures, and stored boundary objects only reference capability ids
-  defined in the catalog.
-
-Maintainers working on the guard-rail scripts that back these checks should read
-`tools/AGENTS.md` for guidance on extending the adapters and validators safely.
+The guard-rail scripts invoked by those targets live under `tools/`—read
+`tools/AGENTS.md` before editing them. When in doubt about a workflow or
+directory contract, follow the layered guidance described in the various
+`*/AGENTS.md` files.
