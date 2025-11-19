@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Entry point for repo tests. Consolidates the fast "probe author" loop
+# (lint+static contract) plus the slower second-tier suites that validate
+# schema, harness behavior, and capability coverage.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
@@ -72,6 +77,7 @@ run_suite() {
 }
 
 if [[ -n "${probe_arg}" ]]; then
+  # Resolve ids like "fs_outside_workspace" or relative paths to probes/<id>.sh.
   probe_script=$(resolve_probe_script_path "${REPO_ROOT}" "${probe_arg}" || true)
   if [[ -z "${probe_script}" ]]; then
     echo "tests/run.sh: unable to resolve probe '${probe_arg}'" >&2
@@ -112,6 +118,7 @@ second_tier_suites=(
   "harness_smoke"
   "baseline_no_codex_smoke"
 )
+# Suites intentionally run in deterministic order so troubleshooting output is stable.
 
 status=0
 for suite in "${second_tier_suites[@]}"; do

@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Validates every probe script without executing it. The suite enforces the
+# static contract (shebang, pipefail, emit-record usage, naming) before probes
+# ever run under bin/fence-run.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
@@ -45,12 +50,14 @@ cd "${REPO_ROOT}"
 
 probe_scripts=()
 if [[ -n "${target_probe}" ]]; then
+  # Allow agents to lint a single probe by id or path.
   resolved_probe=$(resolve_probe_script_path "${REPO_ROOT}" "${target_probe}" || true)
   if [[ -z "${resolved_probe}" ]]; then
     echo "static_probe_contract: unable to resolve probe '${target_probe}'" >&2
     exit 1
   fi
   if [[ "${resolved_probe}" != "${REPO_ROOT}/probes/"* ]]; then
+    # Catch accidental references outside probes/—these aren't part of the suite.
     echo "static_probe_contract: '${resolved_probe}' is outside probes/" >&2
     exit 1
   fi
@@ -98,6 +105,7 @@ for script in "${probe_scripts[@]}"; do
   if [[ -z "${probe_name}" ]]; then
     errors+=("probe_name is not defined")
   elif [[ "${probe_name}" != "${file_stem}" ]]; then
+    # Filename doubles as the probe id, so keep them in sync.
     errors+=("probe_name '${probe_name}' does not match filename '${file_stem}'")
   fi
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Executes bin/emit-record once and verifies the resulting boundary object still
+# matches the cfbo-v1 schema. Acts as a safety net for accidental schema drift.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
@@ -11,6 +15,7 @@ payload_tmp=$(mktemp)
 record_tmp=$(mktemp)
 trap 'rm -f "${payload_tmp}" "${record_tmp}"' EXIT
 
+# Produce a tiny but representative payload fixture without touching the probes.
 cat <<'JSON' > "${payload_tmp}"
 {
   "stdout_snippet": "fixture-stdout",
@@ -50,5 +55,6 @@ jq -e '
   (.result | has("raw_exit_code") and has("errno") and has("message") and has("duration_ms") and has("error_detail")) and
   (.payload.stdout_snippet == "fixture-stdout" and .payload.stderr_snippet == "fixture-stderr" and (.payload.raw | type == "object"))
 ' "${record_tmp}" >/dev/null
+# jq -e exits non-zero if any invariant fails, propagating failure to the suite.
 
 echo "boundary_object_schema: PASS"

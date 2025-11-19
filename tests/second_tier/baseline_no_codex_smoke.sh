@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Proves the harness can run in baseline mode even when the codex CLI is absent.
+# Ensures tests never accidentially depend on Codex when exercising baseline.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
@@ -30,6 +34,7 @@ temp_path=$(mktemp -d)
 output_tmp=$(mktemp)
 jq_path=$(command -v jq 2>/dev/null || true)
 if [[ -n "${jq_path}" ]]; then
+  # Provide jq in the temp PATH because the fixture probe invokes it directly.
   ln -s "${jq_path}" "${temp_path}/jq" 2>/dev/null || cp "${jq_path}" "${temp_path}/jq"
 fi
 
@@ -71,6 +76,7 @@ hash -r
 bin/fence-run baseline "${fixture_name}" > "${output_tmp}"
 
 if bin/fence-run codex-sandbox "${fixture_name}" >/dev/null 2>&1; then
+  # Codex mode should fail fast because codex is intentionally missing in PATH.
   echo "baseline_no_codex_smoke: expected codex-sandbox to fail without codex but it succeeded" >&2
   exit 1
 fi

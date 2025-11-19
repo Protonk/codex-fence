@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Fast syntax-only lint for probe scripts. The goal is to fail immediately when
+# an edit introduces a parsing error, keeping probe development loops tight.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 usage() {
@@ -23,6 +27,7 @@ for script in "$@"; do
     continue
   fi
 
+  # bash -n returns non-zero when the script fails to parse.
   if ! bash -n "${script}" >/dev/null 2>&1; then
     echo "light_lint: bash -n failed for '${script}'" >&2
     status=1

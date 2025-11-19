@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Minimal probe shim used by integration tests. It touches only temporary files
+# and emits a deterministic boundary object so suites can assert harness output.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root_candidate="${script_dir}"
 repo_root=""
 while [[ -z "${repo_root}" && "${repo_root_candidate}" != "/" ]]; do
+  # Walk upward until bin/emit-record appears—this anchors the repo root.
   if [[ -x "${repo_root_candidate}/bin/emit-record" ]]; then
     repo_root="${repo_root_candidate}"
     break
@@ -25,14 +30,17 @@ target_file="${workspace_tmp}/fixture.txt"
 trap 'rm -rf "${workspace_tmp}"' EXIT
 
 printf 'fixture-line' > "${target_file}"
+# Mirror what bin/fence-run would capture so the record looks realistic.
 command_executed="printf fixture-line > ${target_file}"
 
 payload_tmp=$(mktemp)
 trap 'rm -rf "${workspace_tmp}" "${payload_tmp}"' EXIT
 
+# Build a payload stub instead of reading from stdin so tests stay hermetic.
 jq -n --arg stdout_snippet "fixture ok" --arg stderr_snippet "" --argjson raw '{"probe":"fixture"}' \
   '{stdout_snippet: $stdout_snippet, stderr_snippet: $stderr_snippet, raw: $raw}' > "${payload_tmp}"
 
+# Emit the same boundary object a real probe would create.
 "${emit_record_bin}" \
   --run-mode "${run_mode}" \
   --probe-name "${probe_name}" \

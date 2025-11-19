@@ -79,6 +79,9 @@ changes by mode, Codex version, or host OS.
 Probe development centers on a fast single-probe loop plus a second tier of
 portable validations. The entry point for both is `tests/run.sh`.
 
+- Need the full map? See [`tests/AGENTS.md`](tests/AGENTS.md) for a walkthrough
+  of `tests/library`, fixtures, and each suite (including how to add new ones).
+
 - `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints just that
   script and enforces the static probe contract. This is the recommended loop
   while authoring or editing a probe.

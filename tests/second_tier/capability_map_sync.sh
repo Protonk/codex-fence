@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Keeps docs/capabilities_coverage.json, the capability adapter, and probe
+# metadata in sync. This prevents drift between human guidance and executable
+# probes.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 # macOS still ships /bin/bash 3.2, so this script sticks to portable Bash
@@ -24,6 +29,7 @@ capability_ids=()
 while IFS= read -r capability_id; do
   capability_ids+=("${capability_id}")
 done < <("${capabilities_adapter}" | jq -r 'keys[]')
+# The adapter reflects schema/capabilities.json, so its keys become the source of truth.
 
 if [[ ${#capability_ids[@]} -eq 0 ]]; then
   echo "capability_map_sync: adapter returned no capability IDs" >&2
@@ -64,6 +70,7 @@ while IFS=$'\t' read -r cap_id has_probe probe_list; do
   fi
 
 done < <(jq -r 'to_entries[] | [.key, (.value.has_probe|tostring), (.value.probe_ids|join(","))] | @tsv' docs/capabilities_coverage.json)
+# Each coverage entry includes whether a probe exists plus the explicit list for readability.
 
 for cap in "${capability_ids[@]}"; do
   if ! list_contains "${cap}" "${coverage_cap_ids[@]}"; then
@@ -140,6 +147,7 @@ for idx in "${!coverage_cap_ids[@]}"; do
     fi
   done
   actual_array_len=${#actual_array[@]}
+  # coverage_array -> docs, actual_array -> live probes.
 
   if [[ "${has_probe_flag}" == "true" && ${actual_array_len} -eq 0 ]]; then
     echo "  [FAIL] capability_map_sync: ${cap_id} marked has_probe=true but no probes declare it" >&2
@@ -152,6 +160,7 @@ for idx in "${!coverage_cap_ids[@]}"; do
   fi
 
   if (( coverage_array_len > 0 )); then
+    # When the docs list explicit probes ensure each one still exists and points back.
     for listed_probe in "${coverage_array[@]}"; do
       if [[ -z "${listed_probe}" ]]; then
         continue
@@ -174,6 +183,7 @@ for idx in "${!coverage_cap_ids[@]}"; do
   fi
 
   if (( actual_array_len > 0 )); then
+    # Conversely, every real probe should be described in coverage docs.
     for actual_probe in "${actual_array[@]}"; do
       if (( coverage_array_len > 0 )) && list_contains "${actual_probe}" "${coverage_array[@]}"; then
         continue

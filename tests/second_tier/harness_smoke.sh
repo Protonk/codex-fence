@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Basic end-to-end test for bin/fence-run baseline mode. It runs a known fixture
+# probe and asserts the recorded boundary object contains fixture markers.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
@@ -31,5 +35,6 @@ jq -e '
   .result.observed_result == "success" and
   (.payload.raw.probe == "fixture")
 ' "${output_tmp}" >/dev/null
+# The jq filter encodes the "happy path" contract the harness should honor.
 
 echo "harness_smoke: PASS"

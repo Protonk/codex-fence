@@ -1,0 +1,84 @@
+# Tests Directory Guide
+
+This guide orients agents who need to understand, extend, or debug the harness
+tests. Pair it with `README.md` for high-level project context.
+
+## Mental model
+
+`tests/` enforces that probes and helpers stay portable and in sync with the
+public boundary-object schema. The directory is split into three layers:
+
+| Layer | Entry point | Purpose |
+| --- | --- | --- |
+| Library | `tests/library/` | Shared Bash helpers + fixtures depended on by every suite. |
+| Fast tier | `tests/run.sh --probe <id>` | Syntax lint + static probe contract for one probe—the tight authoring loop. |
+| Second tier | `tests/run.sh` | Global checks that validate documentation, schema, and harness plumbing. |
+
+The default make target `make test` simply runs `tests/run.sh` with no
+arguments, so anything added here must be portable (`/bin/bash 3.2` on macOS),
+silent on success, and deterministic.
+
+## Quick start for agents
+
+1. **While editing a probe** use `tests/run.sh --probe <id>` (or `make probe
+   PROBE=<id>`). This runs `probe_contract/light_lint.sh` followed by
+   `probe_contract/static_probe_contract.sh` for the resolved probe path.
+2. **Before sending a change** run `tests/run.sh`. It automatically lints every
+   probe, then executes the second-tier suites. Failures are summarized with a
+   `[FAIL]` line; re-run the failing script directly to iterate faster.
+3. **Debugging**: All suites are normal Bash scripts. Run them directly (e.g.
+   `tests/second_tier/harness_smoke.sh`) to reproduce failures. They only depend
+   on in-repo helpers.
+
+## Library components
+
+- `tests/library/utils.sh` exposes `REPO_ROOT`, `extract_probe_var`, and
+  `resolve_probe_script_path`. Source it from any new suite instead of duplicating
+  path logic.
+- `tests/library/fixtures/probe_fixture.sh` is a self-contained probe used by the
+  smoke suites. It writes to a temporary workspace and pipes a deterministic
+  record into `bin/emit-record`. Prefer copying this file when you need a dummy
+  probe rather than inventing ad‑hoc scripts.
+
+## Second-tier suite map
+
+| Script | Purpose | Notes |
+| --- | --- | --- |
+| `second_tier/capability_map_sync.sh` | Confirms docs/capabilities_coverage.json, tools/capabilities_adapter.sh, and probe metadata all reference the same capability ids. | Update docs + adapter when adding capabilities before rerunning this script. |
+| `second_tier/boundary_object_schema.sh` | Runs `bin/emit-record` with a fixture payload and validates the resulting JSON with `jq`. | Extend the jq expression whenever schema/boundary_object.json grows. |
+| `second_tier/harness_smoke.sh` | Runs the fixture probe via `bin/fence-run baseline` and checks the returned boundary object. | Keeps the baseline path honest; extend if fixtures gain new fields. |
+| `second_tier/baseline_no_codex_smoke.sh` | Temporarily hides the Codex CLI from `PATH` and asserts baseline runs still succeed while codex modes fail. | Make sure new smoke fixtures do not depend on `codex`. |
+
+Add any heavier “whole repo” validation here. Follow the same structure: source
+`tests/library/utils.sh`, short-circuit on missing prerequisites, and print
+`name: PASS/FAIL` summaries.
+
+## Adding or modifying tests
+
+- **Guard-rail comments:** Every script now starts with a summary block—keep this
+  habit so future agents know why a suite exists.
+- **New probe-level checks:** Extend `tests/probe_contract/static_probe_contract.sh`
+  (for structural, non-executing rules) or `tests/probe_contract/light_lint.sh`
+  (for syntax-only issues). This keeps the single-probe workflow fast.
+- **New fixtures:** Place them under `tests/library/fixtures/` so multiple suites
+  can share them, and document any special behavior.
+- **New suites:** Put them under `tests/second_tier/` and add the filename (minus
+  `.sh`) to the `second_tier_suites` array in `tests/run.sh` so the orchestration
+  picks them up.
+
+## When things fail
+
+- **Static probe contract errors** list per-file issues (missing shebang,
+  mismatched `probe_name`, etc.). Open the failing script directly and fix the
+  reported condition.
+- **Capability coverage failures** mean either a document drift or a probe now
+  references an unknown capability. Update `docs/capabilities_coverage.json` and
+  `tools/capabilities_adapter.sh` in the same commit.
+- **Harness/baseline smoke failures** often indicate regressions in
+  `bin/fence-run` or `bin/emit-record`. Run the failing script with `bash -x` to
+  inspect the plumbing.
+- **Schema failures** will dump the offending JSON record; compare it with
+  `docs/boundary_object.md` and update the jq assertions in lock-step.
+
+Keeping this structure light and documented lets agents diagnose a broken probe
+run quickly, even when the error surfaced far away from their changes.
