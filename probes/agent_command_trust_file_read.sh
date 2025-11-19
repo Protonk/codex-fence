@@ -11,10 +11,9 @@ target_path="${FENCE_TRUST_LIST_PATH:-${HOME}/.config/codex/trust-list.json}"
 
 printf -v command_executed "cat %q" "${target_path}"
 
-stdout_tmp=$(mktemp)
 stderr_tmp=$(mktemp)
 payload_tmp=$(mktemp)
-trap 'rm -f "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}"' EXIT
+trap 'rm -f "${stderr_tmp}" "${payload_tmp}"' EXIT
 
 status="error"
 errno_value=""
@@ -22,12 +21,11 @@ message=""
 raw_exit_code=""
 
 set +e
-cat "${target_path}" >"${stdout_tmp}" 2>"${stderr_tmp}"
+cat "${target_path}" >/dev/null 2>"${stderr_tmp}"
 exit_code=$?
 set -e
 
 raw_exit_code="${exit_code}"
-stdout_text=$(tr -d '\0' <"${stdout_tmp}")
 stderr_text=$(tr -d '\0' <"${stderr_tmp}")
 lower_err=$(printf '%s' "${stderr_text}" | tr 'A-Z' 'a-z')
 
@@ -48,16 +46,52 @@ else
   message="Failed to read trust list file"
 fi
 
+bytes_read=""
+if [[ ${exit_code} -eq 0 ]]; then
+  bytes_candidate=$(wc -c <"${target_path}" 2>/dev/null || true)
+  if [[ -n "${bytes_candidate}" ]]; then
+    bytes_read=$(printf '%s' "${bytes_candidate}" | tr -d '[:space:]')
+  fi
+fi
+
+hash_value=""
+hash_tool=""
+if [[ ${exit_code} -eq 0 ]]; then
+  if command -v shasum >/dev/null 2>&1; then
+    hash_value=$(shasum -a 256 "${target_path}" 2>/dev/null | awk '{print $1}')
+    if [[ -n "${hash_value}" ]]; then
+      hash_tool="shasum -a 256"
+    fi
+  elif command -v openssl >/dev/null 2>&1; then
+    hash_value=$(openssl dgst -sha256 "${target_path}" 2>/dev/null | awk '{print $NF}')
+    if [[ -n "${hash_value}" ]]; then
+      hash_tool="openssl sha256"
+    fi
+  fi
+fi
+
+stdout_snippet=""
+if [[ ${exit_code} -eq 0 ]]; then
+  stdout_snippet="(suppressed: trust list contents not logged)"
+fi
+
 raw_payload=$(jq -n \
   --arg path "${target_path}" \
-  --arg stdout "${stdout_text}" \
   --arg stderr "${stderr_text}" \
   --argjson exit_code "${exit_code}" \
-  --argjson bytes_read "${#stdout_text}" \
-  '{path: $path, exit_code: $exit_code, bytes_read: $bytes_read, stdout: $stdout, stderr: $stderr}')
+  --arg bytes_read "${bytes_read}" \
+  --arg hash "${hash_value}" \
+  --arg hash_tool "${hash_tool}" \
+  '{path: $path,
+    exit_code: $exit_code,
+    bytes_read: (if ($bytes_read | length) > 0 then ($bytes_read | tonumber) else null end),
+    sha256: (if ($hash | length) > 0 then $hash else null end),
+    hash_tool: (if ($hash_tool | length) > 0 then $hash_tool else null end),
+    content_logged: false,
+    stderr: $stderr}')
 
 jq -n \
-  --arg stdout_snippet "${stdout_text}" \
+  --arg stdout_snippet "${stdout_snippet}" \
   --arg stderr_snippet "${stderr_text}" \
   --argjson raw "${raw_payload}" \
   '{stdout_snippet: ($stdout_snippet | if length > 400 then (.[:400] + "…") else . end),

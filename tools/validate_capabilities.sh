@@ -75,6 +75,76 @@ extract_var() {
   printf '%s\n' "${value}"
 }
 
+extract_secondary_caps() {
+  local file="$1"
+  awk '
+    function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+    function unquote(s) {
+      if (length(s) >= 2) {
+        first = substr(s, 1, 1)
+        last = substr(s, length(s), 1)
+        if ((first == "\"" && last == "\"") || (first == "'"'"'" && last == "'"'"'")) {
+          s = substr(s, 2, length(s) - 2)
+        }
+      }
+      return s
+    }
+    function emit(token) {
+      token = trim(token)
+      token = unquote(token)
+      if (token == "" || token ~ /\$/) {
+        return
+      }
+      print token
+    }
+    function process_array_line(text) {
+      line = text
+      sub(/#.*/, "", line)
+      if (line ~ /\)/) {
+        sub(/\).*/, "", line)
+        array_open = 0
+      }
+      gsub(/[\t\r\n]/, " ", line)
+      n = split(line, parts, /[[:space:]]+/)
+      for (i = 1; i <= n; i++) {
+        emit(parts[i])
+      }
+    }
+    BEGIN {
+      flag_regex = "--secondary-capability-id[[:space:]]+(\"[^\"]+\"|'\''[^'\'']+'\''|[^[:space:]]+)"
+      array_open = 0
+    }
+    {
+      line = $0
+      if (array_open) {
+        process_array_line(line)
+        next
+      }
+      if (line ~ /^[[:space:]]*secondary_capability_id=/) {
+        value = line
+        sub(/^[[:space:]]*secondary_capability_id=/, "", value)
+        sub(/#.*/, "", value)
+        emit(value)
+        next
+      }
+      if (line ~ /^[[:space:]]*secondary_capability_ids=\(/) {
+        remainder = line
+        sub(/^[[:space:]]*secondary_capability_ids=\(/, "", remainder)
+        array_open = 1
+        process_array_line(remainder)
+        next
+      }
+      tmp = line
+      while (match(tmp, flag_regex)) {
+        token = substr(tmp, RSTART, RLENGTH)
+        sub(/^--secondary-capability-id[[:space:]]+/, "", token)
+        emit(token)
+        tmp = substr(tmp, RSTART + RLENGTH)
+      }
+    }
+  ' "${file}"
+}
+
 probe_files=()
 if [[ -d "${repo_root}/probes" ]]; then
   while IFS= read -r script; do
@@ -97,10 +167,11 @@ for script in "${probe_files[@]}"; do
     check_capability "${primary_cap}" "${script} primary_capability_id"
   fi
 
-  secondary_cap=$(extract_var "${script}" "secondary_capability_id" || true)
-  if [[ -n "${secondary_cap}" ]]; then
-    check_capability "${secondary_cap}" "${script} secondary_capability_id"
-  fi
+  while IFS= read -r secondary_cap; do
+    if [[ -n "${secondary_cap}" ]]; then
+      check_capability "${secondary_cap}" "${script} secondary_capability_id"
+    fi
+  done < <(extract_secondary_caps "${script}" || true)
 done
 
 # Probe outputs are stored in out/*.json; validate any embedded capability IDs.

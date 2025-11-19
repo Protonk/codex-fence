@@ -63,15 +63,12 @@ if [[ -z "${probe_path}" ]]; then
   exit 1
 fi
 
-# Normalise permissions when the file exists but is not executable.
 if [[ ! -x "${probe_path}" ]]; then
   if [[ -f "${probe_path}" ]]; then
-    chmod +x "${probe_path}" 2>/dev/null || true
+    echo "Probe is not executable: ${probe_path}" >&2
+  else
+    echo "Probe not found or not executable: ${probe_path}" >&2
   fi
-fi
-
-if [[ ! -x "${probe_path}" ]]; then
-  echo "Probe not found or not executable: ${probe_path}" >&2
   exit 1
 fi
 

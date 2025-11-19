@@ -1,6 +1,6 @@
 # codex-fence
 
-`codex-fence` is a lightweight harness for poking at Codex security fences. It runs tiny "probe" scripts under several run modes (baseline shell, Codex sandbox, and an experimental Codex full-access mode) and records the results as structured JSON "boundary objects". The tool never talks to models—it simply observes how the runtime fence reacts to filesystem, network, process, or other system interactions.
+`codex-fence` is a lightweight harness for poking at security fences around the [codex](https://github.com/openai/codex) tool. It runs tiny "probe" scripts under several run modes (baseline shell, Codex sandbox, and an experimental Codex full-access mode) and records the results as structured JSON "boundary objects". The tool never talks to models—it simply observes how the runtime fence reacts to filesystem, network, process, or other system interactions.
 
 ## Why?
 
@@ -27,8 +27,8 @@ We compile a machine readable catalog of security policy capabilities that we kn
 
 This approach has obvious disadvantages. It is clearly inefficient--the repository structure is built around rapid AI generation of probes, some of which are silly or vacuous. In all likelyhood most will never contribute to useful signals about security. It is also **deeply** paranoid, perhaps needlessly so. Certainly past the point of diminishing returns.
 
-However, if we view these disadvantages as choices, the benefits of codex-fence appear:
-- What codex can and can't do in your environment is always empirically determined. We don't need to trust codex or the os.
+However, if we view these disadvantages as choices, benefits appear immediately:
+- What Codex can and can't do in your environment is always empirically determined. We don't need to trust `codex` or the os.
 - Running many probes is a defense against the security policy surface becoming unexpectedly more complex. Running so many and so many silly ones can (potentially) allow us to capture added complexity that's hard to anticipate.
 - With a rigid output structure, disparate probes can be integrated cleanly into signals about capabilities. Weird probes, paranoid probes, even pointless probes that don't add signal cannot contribute to noise. 
 
