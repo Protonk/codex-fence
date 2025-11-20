@@ -203,6 +203,10 @@ Call `bin/emit-record` exactly once with:
 See `docs/boundary_object.md` for a complete field description (cfbo-v1
 includes `capabilities_schema_version` and `capability_context` snapshots to
 provide full context for every record).
+`capabilities_schema_version` is the CatalogKey chosen by the harness when it
+loads capability catalogs via the Rust `CatalogRepository` (`src/catalog/`).
+Probes should continue to declare capability IDs only; the harness resolves
+those IDs to snapshots without hard-coding a specific catalog.
 
 ### Minimal example
 

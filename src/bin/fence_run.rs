@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use codex_fence::find_repo_root;
+use codex_fence::{codex_present, find_repo_root, resolve_probe};
 use std::env;
 use std::env::VarError;
 use std::ffi::OsString;
@@ -19,12 +19,12 @@ fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     let workspace_root = canonicalize_path(&repo_root);
     let workspace_plan = determine_workspace_plan(&workspace_root, args.workspace_override)?;
-    let probe_path = resolve_probe_path(&workspace_root, &args.probe_name)?;
-    ensure_probe_executable(&probe_path)?;
+    let resolved_probe = resolve_probe(&workspace_root, &args.probe_name)?;
+    ensure_probe_executable(&resolved_probe.path)?;
 
     let sandbox_mode = sandbox_mode_for_mode(&args.run_mode)?;
     let platform = detect_platform().unwrap_or_else(|| env::consts::OS.to_string());
-    let command_spec = build_command_spec(&args.run_mode, &platform, &probe_path)?;
+    let command_spec = build_command_spec(&args.run_mode, &platform, &resolved_probe.path)?;
 
     run_command(command_spec, &args.run_mode, &sandbox_mode, &workspace_plan)?;
     Ok(())
@@ -155,43 +155,6 @@ fn canonicalize_os_string(value: &OsString) -> OsString {
         .into_os_string()
 }
 
-fn resolve_probe_path(workspace_root: &Path, identifier: &str) -> Result<PathBuf> {
-    let probes_root = workspace_root.join("probes");
-    let probes_root = fs::canonicalize(&probes_root).with_context(|| {
-        format!(
-            "Unable to canonicalize probes dir at {}",
-            probes_root.display()
-        )
-    })?;
-
-    let trimmed = identifier.strip_prefix("./").unwrap_or(identifier);
-    let mut attempts = Vec::new();
-    if Path::new(trimmed).is_absolute() {
-        attempts.push(PathBuf::from(trimmed));
-    } else {
-        attempts.push(workspace_root.join(trimmed));
-        if !trimmed.ends_with(".sh") {
-            attempts.push(workspace_root.join(format!("{trimmed}.sh")));
-        }
-        attempts.push(workspace_root.join("probes").join(trimmed));
-        if !trimmed.ends_with(".sh") {
-            attempts.push(workspace_root.join("probes").join(format!("{trimmed}.sh")));
-        }
-    }
-
-    for candidate in attempts {
-        if candidate.is_file() {
-            if let Ok(canonical) = fs::canonicalize(&candidate) {
-                if canonical.starts_with(&probes_root) {
-                    return Ok(canonical);
-                }
-            }
-        }
-    }
-
-    bail!("Probe not found: {identifier}")
-}
-
 fn ensure_probe_executable(path: &Path) -> Result<()> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("Probe not found or not executable: {}", path.display()))?;
@@ -244,7 +207,7 @@ fn build_command_spec(run_mode: &str, platform: &str, probe_path: &Path) -> Resu
             args: Vec::new(),
         }),
         "codex-sandbox" => {
-            ensure_codex_available(run_mode)?;
+            ensure_codex_available()?;
             let target = platform_target(platform)?;
             Ok(CommandSpec {
                 program: OsString::from("codex"),
@@ -258,7 +221,7 @@ fn build_command_spec(run_mode: &str, platform: &str, probe_path: &Path) -> Resu
             })
         }
         "codex-full" => {
-            ensure_codex_available(run_mode)?;
+            ensure_codex_available()?;
             let target = platform_target(platform)?;
             Ok(CommandSpec {
                 program: OsString::from("codex"),
@@ -283,26 +246,11 @@ fn platform_target(platform: &str) -> Result<&'static str> {
     }
 }
 
-fn ensure_codex_available(run_mode: &str) -> Result<()> {
-    if codex_available() {
+fn ensure_codex_available() -> Result<()> {
+    if codex_present() {
         return Ok(());
     }
-    bail!(
-        "codex CLI not found; mode '{run_mode}' requires codex. Install codex or run baseline instead."
-    )
-}
-
-fn codex_available() -> bool {
-    env::var_os("PATH")
-        .map(|paths| {
-            env::split_paths(&paths).any(|dir| {
-                let candidate = dir.join("codex");
-                fs::metadata(&candidate)
-                    .map(|meta| meta.is_file() && has_execute_bit(&meta))
-                    .unwrap_or(false)
-            })
-        })
-        .unwrap_or(false)
+    bail!("codex CLI not found; codex-* modes require codex. Install codex or run baseline instead.")
 }
 
 fn detect_platform() -> Option<String> {
@@ -354,7 +302,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
-    fn resolve_probe_path_prefers_probes_dir() {
+    fn resolve_probe_prefers_probes_dir() {
         let workspace = TempWorkspace::new();
         let probes = workspace.root.join("probes");
         fs::create_dir_all(&probes).unwrap();
@@ -367,8 +315,8 @@ mod tests {
             perms.set_mode(0o755);
             fs::set_permissions(&script, perms).unwrap();
         }
-        let resolved = resolve_probe_path(&workspace.root, "example").unwrap();
-        assert!(resolved.ends_with("example.sh"));
+        let resolved = resolve_probe(&workspace.root, "example").unwrap();
+        assert!(resolved.path.ends_with("example.sh"));
     }
 
     #[test]

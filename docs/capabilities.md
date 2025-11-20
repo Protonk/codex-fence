@@ -8,6 +8,12 @@ Read this document to see how each field in `capabilities.json` is structured an
 
 `capabilities.json` begins with the `schema_version`, currently **macOS_codex_v1**. The adapter enforces that this identifier is an alphanumeric string with no whitespace so downstream tools can hard-fail on drift.
 
+### Catalog keys and repositories
+
+- `schema_version` is the **CatalogKey** used across the harness. Boundary objects echo it as `capabilities_schema_version` so downstream readers know which catalog to consult.
+- The Rust types under `src/catalog/` load this file into a `CapabilityCatalog` and register it inside a `CatalogRepository`. The repository is intentionally generic—drop in another catalog JSON with a different `schema_version`, register it, and the same lookup helpers work.
+- Probes stay insulated from catalog internals: they declare `CapabilityId`s, while the harness resolves those IDs to `CapabilitySnapshot`s when emitting `cfbo-v1`.
+
 ## Catalog scope and shared references
 
 - The `scope` block sets the boundary for the catalog:

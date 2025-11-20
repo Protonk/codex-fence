@@ -194,7 +194,7 @@ fn boundary_object_schema() -> Result<()> {
     assert_eq!(record.probe.id, "schema_test_fixture");
     assert_eq!(record.probe.version, "1");
     assert_eq!(
-        record.probe.primary_capability_id,
+        record.probe.primary_capability_id.0,
         "cap_fs_read_workspace_tree"
     );
     assert!(

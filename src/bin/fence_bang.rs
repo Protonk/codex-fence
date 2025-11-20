@@ -1,18 +1,15 @@
 use anyhow::{Context, Result, bail};
-use codex_fence::{codex_present, find_repo_root, resolve_helper_binary, split_list};
+use codex_fence::{
+    codex_present, find_repo_root, list_probes, resolve_helper_binary, resolve_probe, split_list,
+    Probe,
+};
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    env, fs,
-    path::{Path, PathBuf},
+    collections::BTreeSet,
+    env,
+    path::Path,
     process::{Command, Stdio},
 };
-
-#[derive(Debug, Clone)]
-struct Probe {
-    id: String,
-    path: PathBuf,
-}
 
 fn main() {
     if let Err(err) = run() {
@@ -79,95 +76,14 @@ fn resolve_probes(repo_root: &Path) -> Result<Vec<Probe>> {
         .unwrap_or_default();
 
     if requested.is_empty() {
-        return list_all_probes(repo_root);
+        return list_probes(repo_root);
     }
 
     let mut probes = Vec::new();
     for raw in requested {
-        probes.push(resolve_probe_identifier(repo_root, &raw)?);
+        probes.push(resolve_probe(repo_root, &raw)?);
     }
     Ok(probes)
-}
-
-fn list_all_probes(repo_root: &Path) -> Result<Vec<Probe>> {
-    let probes_dir = repo_root.join("probes");
-    let mut results = BTreeMap::new();
-    for entry in fs::read_dir(&probes_dir)
-        .with_context(|| format!("Failed to read probes dir at {}", probes_dir.display()))?
-    {
-        let entry = entry?;
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        if path.extension().and_then(|e| e.to_str()) != Some("sh") {
-            continue;
-        }
-        let canonical = fs::canonicalize(&path)
-            .with_context(|| format!("Failed to canonicalize probe path {}", path.display()))?;
-        if let Some(stem) = canonical.file_stem().and_then(|s| s.to_str()) {
-            results.insert(
-                stem.to_string(),
-                Probe {
-                    id: stem.to_string(),
-                    path: canonical,
-                },
-            );
-        }
-    }
-
-    if results.is_empty() {
-        bail!("No probes found under {}", probes_dir.to_string_lossy());
-    }
-
-    Ok(results.into_values().collect())
-}
-
-fn resolve_probe_identifier(repo_root: &Path, raw: &str) -> Result<Probe> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        bail!("Empty probe identifier requested");
-    }
-
-    let probes_root =
-        fs::canonicalize(repo_root.join("probes")).context("Failed to resolve probes directory")?;
-    let mut candidates = Vec::new();
-    let input_path = PathBuf::from(trimmed);
-    if input_path.is_absolute() {
-        candidates.push(input_path.clone());
-    } else {
-        candidates.push(repo_root.join(&input_path));
-        if input_path.extension().is_none() {
-            candidates.push(repo_root.join(format!("{trimmed}.sh")));
-        }
-        candidates.push(repo_root.join("probes").join(&input_path));
-        if input_path.extension().is_none() {
-            candidates.push(repo_root.join("probes").join(format!("{trimmed}.sh")));
-        }
-    }
-
-    for candidate in candidates {
-        if !candidate.is_file() {
-            continue;
-        }
-        let canonical = fs::canonicalize(&candidate).with_context(|| {
-            format!(
-                "Failed to canonicalize candidate probe {}",
-                candidate.display()
-            )
-        })?;
-        if !canonical.starts_with(&probes_root) {
-            continue;
-        }
-        if let Some(stem) = canonical.file_stem().and_then(|s| s.to_str()) {
-            return Ok(Probe {
-                id: stem.to_string(),
-                path: canonical,
-            });
-        }
-    }
-
-    bail!("Probe not found or outside probes/: {trimmed}");
 }
 
 fn run_probe(repo_root: &Path, probe: &Probe, mode: &str) -> Result<()> {

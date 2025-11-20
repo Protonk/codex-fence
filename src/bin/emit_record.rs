@@ -1,7 +1,10 @@
-use anyhow::{Context, Result, anyhow, bail};
-use codex_fence::{find_repo_root, resolve_helper_binary};
+use anyhow::{anyhow, bail, Context, Result};
+use codex_fence::{
+    find_repo_root, load_catalog_from_path, resolve_helper_binary, CatalogKey, CapabilityCategory,
+    CapabilityId, CapabilityLayer, CapabilitySnapshot,
+};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -126,8 +129,8 @@ struct CliArgs {
     error_detail: Option<String>,
     payload_file: Option<PathBuf>,
     operation_args: String,
-    primary_capability_id: String,
-    secondary_capability_ids: Vec<String>,
+    primary_capability_id: CapabilityId,
+    secondary_capability_ids: Vec<CapabilityId>,
     command: String,
 }
 
@@ -257,8 +260,14 @@ impl PartialArgs {
             error_detail: error_detail.filter(not_empty),
             payload_file,
             operation_args: operation_args.unwrap_or_else(|| "{}".to_string()),
-            primary_capability_id: Self::require("--primary-capability-id", primary_capability_id)?,
-            secondary_capability_ids,
+            primary_capability_id: CapabilityId(Self::require(
+                "--primary-capability-id",
+                primary_capability_id,
+            )?),
+            secondary_capability_ids: secondary_capability_ids
+                .into_iter()
+                .map(|id| CapabilityId(id))
+                .collect(),
             command: Self::require("--command", command)?,
         })
     }
@@ -304,7 +313,7 @@ fn is_executable(path: &Path) -> bool {
     }
 }
 
-fn load_capabilities(path: &Path) -> Result<BTreeMap<String, CapabilityRecord>> {
+fn load_capabilities(path: &Path) -> Result<BTreeMap<CapabilityId, CapabilityRecord>> {
     let output = Command::new(path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -316,54 +325,54 @@ fn load_capabilities(path: &Path) -> Result<BTreeMap<String, CapabilityRecord>> 
         bail!("Capability adapter failed: {stderr}");
     }
 
-    let map: BTreeMap<String, CapabilityRecord> = serde_json::from_slice(&output.stdout)
+    let map: BTreeMap<CapabilityId, CapabilityRecord> = serde_json::from_slice(&output.stdout)
         .context("Capability adapter emitted invalid JSON")?;
 
     Ok(map)
 }
 
 fn normalize_secondary_ids(
-    capabilities: &BTreeMap<String, CapabilityRecord>,
-    raw: &[String],
-) -> Result<Vec<String>> {
-    let mut acc = BTreeSet::new();
+    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    raw: &[CapabilityId],
+) -> Result<Vec<CapabilityId>> {
+    let mut acc: BTreeSet<CapabilityId> = BTreeSet::new();
     for value in raw {
-        let trimmed = value.trim();
+        let trimmed = value.0.trim();
         if trimmed.is_empty() {
             continue;
         }
-        validate_capability_id(capabilities, trimmed, "secondary capability id")?;
-        acc.insert(trimmed.to_string());
+        let normalized = CapabilityId(trimmed.to_string());
+        validate_capability_id(capabilities, &normalized, "secondary capability id")?;
+        acc.insert(normalized);
     }
     Ok(acc.into_iter().collect())
 }
 
 fn validate_capability_id(
-    capabilities: &BTreeMap<String, CapabilityRecord>,
-    value: &str,
+    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    value: &CapabilityId,
     label: &str,
 ) -> Result<()> {
     if capabilities.contains_key(value) {
         return Ok(());
     }
-    bail!("Unknown {label}: {value}. Expected one of the IDs in schema/capabilities.json.");
+    bail!(
+        "Unknown {label}: {}. Expected one of the IDs in schema/capabilities.json.",
+        value.0
+    );
 }
 
-fn read_capabilities_schema_version(repo_root: &Path) -> Result<String> {
+fn read_capabilities_schema_version(repo_root: &Path) -> Result<CatalogKey> {
     let path = repo_root.join("schema/capabilities.json");
-    let contents =
-        fs::read_to_string(&path).with_context(|| format!("Unable to read {}", path.display()))?;
-    let value: Value = serde_json::from_str(&contents)
-        .with_context(|| format!("Failed to parse JSON from {}", path.display()))?;
-    let Some(raw) = value.get("schema_version").and_then(|v| v.as_str()) else {
-        bail!("Unable to determine capabilities schema_version from schema/capabilities.json");
-    };
-    if !is_valid_schema_version(raw) {
+    let catalog = load_catalog_from_path(&path)
+        .with_context(|| format!("Unable to load capability catalog from {}", path.display()))?;
+    let value = catalog.key.0.clone();
+    if !is_valid_schema_version(&value) {
         bail!(
-            "Invalid capabilities schema_version: {raw}. Expected an alphanumeric string without spaces."
+            "Invalid capabilities schema_version: {value}. Expected an alphanumeric string without spaces."
         );
     }
-    Ok(raw.to_string())
+    Ok(catalog.key)
 }
 
 fn is_valid_schema_version(value: &str) -> bool {
@@ -405,30 +414,39 @@ fn default_payload() -> Value {
 
 #[derive(Deserialize, Clone)]
 struct CapabilityRecord {
-    id: String,
-    category: Option<String>,
-    layer: Option<String>,
+    id: CapabilityId,
+    category: Option<CapabilityCategory>,
+    layer: Option<CapabilityLayer>,
 }
 
 fn capability_snapshot(
-    capabilities: &BTreeMap<String, CapabilityRecord>,
-    cap_id: &str,
-) -> Result<Value> {
+    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    cap_id: &CapabilityId,
+) -> Result<CapabilitySnapshot> {
     let Some(cap) = capabilities.get(cap_id) else {
-        bail!("Unable to resolve capability metadata for {cap_id}");
+        bail!("Unable to resolve capability metadata for {}", cap_id.0);
     };
 
-    Ok(json!({
-        "id": cap.id,
-        "category": cap.category,
-        "layer": cap.layer,
-    }))
+    let category = cap
+        .category
+        .clone()
+        .ok_or_else(|| anyhow!("Capability {} missing category", cap_id.0))?;
+    let layer = cap
+        .layer
+        .clone()
+        .ok_or_else(|| anyhow!("Capability {} missing layer", cap_id.0))?;
+
+    Ok(CapabilitySnapshot {
+        id: cap.id.clone(),
+        category,
+        layer,
+    })
 }
 
 fn snapshots_for_secondary(
-    capabilities: &BTreeMap<String, CapabilityRecord>,
-    ids: &[String],
-) -> Result<Vec<Value>> {
+    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    ids: &[CapabilityId],
+) -> Result<Vec<CapabilitySnapshot>> {
     let mut snapshots = Vec::new();
     for id in ids {
         snapshots.push(capability_snapshot(capabilities, id)?);
@@ -489,20 +507,20 @@ fn not_empty(value: &String) -> bool {
 mod tests {
     use super::*;
 
-    fn sample_caps() -> BTreeMap<String, CapabilityRecord> {
+    fn sample_caps() -> BTreeMap<CapabilityId, CapabilityRecord> {
         let mut map = BTreeMap::new();
         map.insert(
-            "cap_a".to_string(),
+            CapabilityId("cap_a".to_string()),
             CapabilityRecord {
-                id: "cap_a".to_string(),
-                category: Some("cat".to_string()),
-                layer: Some("layer".to_string()),
+                id: CapabilityId("cap_a".to_string()),
+                category: Some(CapabilityCategory::Other("cat".to_string())),
+                layer: Some(CapabilityLayer::Other("layer".to_string())),
             },
         );
         map.insert(
-            "cap_b".to_string(),
+            CapabilityId("cap_b".to_string()),
             CapabilityRecord {
-                id: "cap_b".to_string(),
+                id: CapabilityId("cap_b".to_string()),
                 category: None,
                 layer: None,
             },
@@ -530,19 +548,28 @@ mod tests {
     fn normalize_secondary_deduplicates_and_trims() {
         let caps = sample_caps();
         let input = vec![
-            " cap_a ".to_string(),
-            "cap_b".to_string(),
-            "".to_string(),
-            "cap_a".to_string(),
+            CapabilityId(" cap_a ".to_string()),
+            CapabilityId("cap_b".to_string()),
+            CapabilityId("".to_string()),
+            CapabilityId("cap_a".to_string()),
         ];
         let normalized = normalize_secondary_ids(&caps, &input).expect("normalized");
-        assert_eq!(normalized, vec!["cap_a".to_string(), "cap_b".to_string()]);
+        assert_eq!(
+            normalized,
+            vec![
+                CapabilityId("cap_a".to_string()),
+                CapabilityId("cap_b".to_string())
+            ]
+        );
     }
 
     #[test]
     fn normalize_secondary_rejects_unknown() {
         let caps = sample_caps();
-        let input = vec!["cap_a".to_string(), "cap_missing".to_string()];
+        let input = vec![
+            CapabilityId("cap_a".to_string()),
+            CapabilityId("cap_missing".to_string()),
+        ];
         assert!(normalize_secondary_ids(&caps, &input).is_err());
     }
 }

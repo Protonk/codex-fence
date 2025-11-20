@@ -75,10 +75,10 @@ fn summarize_capabilities(records: &[BoundaryObject]) -> BTreeMap<String, Capabi
     for record in records {
         let snapshot = capability_snapshot(record);
         let entry = map
-            .entry(snapshot.id.clone())
+            .entry(snapshot.id.0.clone())
             .or_insert_with(|| CapabilitySummary {
-                category: snapshot.category.clone(),
-                layer: snapshot.layer.clone(),
+                category: snapshot.category.as_str().to_string(),
+                layer: snapshot.layer.as_str().to_string(),
                 ..Default::default()
             });
         entry.modes.insert(
@@ -91,14 +91,7 @@ fn summarize_capabilities(records: &[BoundaryObject]) -> BTreeMap<String, Capabi
 }
 
 fn capability_snapshot(record: &BoundaryObject) -> CapabilitySnapshot {
-    if let Some(ctx) = &record.capability_context {
-        return ctx.primary.clone();
-    }
-    CapabilitySnapshot {
-        id: record.probe.primary_capability_id.clone(),
-        category: "unknown".to_string(),
-        layer: "unknown".to_string(),
-    }
+    record.capability_context.primary.clone()
 }
 
 fn collect_modes(records: &[BoundaryObject]) -> Vec<String> {
@@ -117,7 +110,8 @@ fn collect_nonsuccess(records: &[BoundaryObject]) -> Vec<String> {
         }
         let capability = record
             .primary_capability_id()
-            .unwrap_or("unknown-capability");
+            .0
+            .as_str();
         let mut detail = format!(
             "{} [{}] -> {} (capability {}, target {})",
             record.probe.id,
