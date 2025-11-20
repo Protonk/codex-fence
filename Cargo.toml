@@ -23,3 +23,11 @@ path = "src/bin/fence_test.rs"
 [[bin]]
 name = "portable-path"
 path = "src/bin/portable_path.rs"
+
+[[bin]]
+name = "emit-record"
+path = "src/bin/emit_record.rs"
+
+[[bin]]
+name = "detect-stack"
+path = "src/bin/detect_stack.rs"

@@ -35,8 +35,9 @@ valuable.
   The fast probe lint entry point, `tests/probe_contract/light_lint.sh`,
   lives next to the static probe contract suite—prefer extending it for new
   checks instead of duplicating logic elsewhere.
-- `bin/emit-record`, `bin/fence-run`, and any new binaries must stay
-  dependency-free beyond POSIX + `jq`.
+- `bin/emit-record`, `bin/fence-run`, and any new helpers must avoid
+  introducing runtime dependencies beyond Bash, `jq`, and the Rust standard
+  library—keep probe plumbing lightweight and portable.
 
 ### Tests
 

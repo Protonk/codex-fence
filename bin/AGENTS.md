@@ -9,13 +9,14 @@ optimize for stability and clarity.
 - **Purpose:** Validate probe input, resolve capability metadata, capture the
   current stack info, and output a single JSON record that matches the CFBO
   schema.
-- **Operational notes:** Reads `schema/capabilities.json` via
-  `tools/capabilities_adapter.sh`, shells out to `bin/detect-stack`, and emits
-  JSON via `jq`. It assumes no network access and must complete quickly because
-  probes invoke it on every operation.
+- **Operational notes:** Implemented as a Rust binary located via the Bash shim
+  in this directory. It shells out to `tools/capabilities_adapter.sh` and
+  `bin/detect-stack`, embeds their JSON, and stays dependency-free beyond Rust's
+  standard library. It assumes no network access and must complete quickly
+  because probes invoke it on every operation.
 - **Expectations for edits:**
-  - Keep the CLI flags backwards compatible; third-party probes shell out to
-    this script exactly as documented.
+  - Keep the CLI flags backwards compatible; third-party probes call
+    `bin/emit-record` exactly as documented.
   - Validate inputs eagerly with friendly errors—agents rely on actionable
     failures when wiring up new probes.
   - Do not add stateful side effects or logging beyond stderr errors; the only
@@ -24,7 +25,8 @@ optimize for stability and clarity.
 ## `detect-stack`
 - **Purpose:** Report details about the current environment (codex CLI version,
   sandbox mode, container tag, OS, etc.) so `emit-record` can embed the context.
-- **Operational notes:** Must remain dependency-free and fast because it runs
+- **Operational notes:** Implemented as a Rust binary invoked via the shim in
+  this directory. It must remain dependency-free and fast because it runs
   before every record emission. The JSON shape is contractually consumed by
   downstream services.
 - **Expectations for edits:**
