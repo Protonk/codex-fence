@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use codex_fence::{codex_present, find_repo_root, split_list};
+use codex_fence::{codex_present, find_repo_root, resolve_helper_binary, split_list};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -171,7 +171,7 @@ fn resolve_probe_identifier(repo_root: &Path, raw: &str) -> Result<Probe> {
 }
 
 fn run_probe(repo_root: &Path, probe: &Probe, mode: &str) -> Result<()> {
-    let runner = repo_root.join("bin/fence-run");
+    let runner = resolve_helper_binary(repo_root, "fence-run")?;
     let output = Command::new(&runner)
         .arg(mode)
         .arg(&probe.path)

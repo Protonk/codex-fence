@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use serde::Serialize;
 use std::env;
 use std::process::Command;
@@ -153,11 +153,8 @@ mod tests {
 
     #[test]
     fn sandbox_mode_codex_full_env_override() {
-        let result = determine_sandbox_mode(
-            "codex-full",
-            Some("custom-profile".to_string()),
-        )
-        .unwrap();
+        let result =
+            determine_sandbox_mode("codex-full", Some("custom-profile".to_string())).unwrap();
         assert_eq!(result, Some("custom-profile".to_string()));
     }
 

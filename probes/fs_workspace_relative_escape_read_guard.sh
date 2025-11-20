@@ -7,7 +7,7 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
 emit_record_bin="${repo_root}/bin/emit-record"
 portable_path_helper="${repo_root}/bin/portable-path"
 if [[ ! -x "${portable_path_helper}" ]]; then
-  echo "probe ${probe_name:-fs_workspace_relative_escape_read_guard}: missing helper ${portable_path_helper}. Build it with 'cargo build --release'." >&2
+  echo "probe ${probe_name:-fs_workspace_relative_escape_read_guard}: missing helper ${portable_path_helper}. Run 'make build-bin'." >&2
   exit 1
 fi
 

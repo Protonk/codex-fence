@@ -38,6 +38,10 @@ valuable.
 - `bin/emit-record`, `bin/fence-run`, and any new helpers must avoid
   introducing runtime dependencies beyond Bash, `jq`, and the Rust standard
   library—keep probe plumbing lightweight and portable.
+- After touching Rust helpers under `src/bin/`, run `make build-bin` (or
+  `tools/sync_bin_helpers.sh`) so the synced binaries in `bin/` match
+  your changes; probes, docs, and tests assume `bin/<helper>` resolves them
+  directly.
 
 ### Tests
 

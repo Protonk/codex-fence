@@ -45,7 +45,7 @@ MODES ?= $(DEFAULT_MODES)
 MATRIX_TARGETS := $(foreach mode,$(MODES),$(addprefix $(OUTDIR)/,$(addsuffix .$(mode).json,$(PROBES))))
 
 # These targets do not correspond to files on disk.
-.PHONY: all matrix clean test validate-capabilities probe install
+.PHONY: all matrix clean test validate-capabilities probe install build-bin
 
 # Default invocation runs the full probe matrix.
 all: matrix
@@ -96,11 +96,13 @@ probe:
 validate-capabilities:
 	tools/validate_capabilities.sh
 
+build-bin:
+	tools/sync_bin_helpers.sh
+
 # Install the CLI + Rust helpers to $(BINDIR), building a release binary first.
-install:
-	CODEX_FENCE_ROOT_HINT="$(CURDIR)" $(CARGO) build --release
+install: build-bin
 	install -d "$(BINDIR)"
 	install -m 755 bin/codex-fence "$(BINDIR)/codex-fence"
-	install -m 755 target/release/fence-bang "$(BINDIR)/fence-bang"
-	install -m 755 target/release/fence-listen "$(BINDIR)/fence-listen"
-	install -m 755 target/release/fence-test "$(BINDIR)/fence-test"
+	install -m 755 bin/fence-bang "$(BINDIR)/fence-bang"
+	install -m 755 bin/fence-listen "$(BINDIR)/fence-listen"
+	install -m 755 bin/fence-test "$(BINDIR)/fence-test"

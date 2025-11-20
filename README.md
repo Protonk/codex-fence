@@ -86,7 +86,7 @@ Once I decide on an API and freeze it I'll retract the "provisionally".
 | Path | Role |
 | --- | --- |
 | `probes/` | Executable probe scripts + author contract; each maps capabilities to observations. |
-| `bin/` | Harness entry points (`fence-run`, `emit-record`, `detect-stack`) plus compiled helpers such as `portable-path` that bind probes to modes and capture stack data. |
+| `bin/` | Synced Rust binaries produced by `make build-bin`; artifacts live here (git-ignored) so callers can run `bin/<helper>` directly. |
 | `lib/` | Reserved for pure Bash helpers; most path logic now routes through the Rust helper in `bin/portable-path`. |
 | `tools/` | Capability adapters/validators that keep metadata consistent across scripts and tests. |
 | `schema/` | Machine-readable capability catalog and cfbo schema consumed by bin/tools/tests. |
@@ -112,10 +112,24 @@ with the toolchain shipped in macOS. Stock macOS + the `codex-universal`
 container already ship Python, so the only additional dependency to install
 manually is `jq`.
 
+## Building the helpers
+
+Before running `bin/*` entry points or the `codex-fence` CLI, sync the Rust
+helpers into `bin/`:
+
+```sh
+make build-bin
+```
+
+This command wraps `tools/sync_bin_helpers.sh`, which compiles the release
+binaries and copies them into `bin/` so every helper resolver
+can find them without depending on `target/{debug,release}`. Re-run it after
+pulling new commits or touching any code under `src/bin/`.
+
 ## Installation
 
-The CLI is a Bash wrapper around Rust helpers that reuse the existing harness.
-Install it onto your `PATH` from the repo root:
+The CLI is implemented in Rust and reuses the existing harness. Install it onto
+your `PATH` from the repo root:
 
 ```sh
 make install PREFIX="$HOME/.local"
@@ -135,7 +149,8 @@ Use `codex-fence` for the common workflows:
   `PROBES`/`MODES` overrides as `make matrix`.
 - `codex-fence --listen` consumes cfbo-v1 JSON from stdin and prints a
   human-readable summary of what succeeded or failed.
-- `codex-fence --test` executes the existing `tests/run.sh` harness.
+- `codex-fence --test` runs `cargo test` and then executes the existing
+  `tests/run.sh` harness (mirrors `make test`).
 
 Pipeline example:
 

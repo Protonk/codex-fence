@@ -31,3 +31,11 @@ path = "src/bin/emit_record.rs"
 [[bin]]
 name = "detect-stack"
 path = "src/bin/detect_stack.rs"
+
+[[bin]]
+name = "fence-run"
+path = "src/bin/fence_run.rs"
+
+[[bin]]
+name = "codex-fence"
+path = "src/bin/codex_fence.rs"

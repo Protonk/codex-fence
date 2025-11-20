@@ -9,7 +9,7 @@
 - Treat this file as a router: decide which subsystem you are editing, then obey the `*/AGENTS.md` in that directory so guidance stays layered instead of duplicated here.
 - Use the supported workflows: `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) for tight probe loops, `tests/run.sh`/`make test` for repo-wide checks, and `make matrix` when you need to exercise probes across modes.
 - `bin/codex-fence` is the top-level CLI for bang/listen/test and delegates to Rust helpers; keep it aligned with the Makefile defaults and existing harness scripts instead of reimplementing probe logic.
-- Preserve the portability stance described in README/CONTRIBUTING—scripts must run on macOS `/bin/bash 3.2` and the `codex-universal` container with only `jq` plus the Rust helpers that ship in `bin/` (build them with `cargo build --release`).
+- Preserve the portability stance described in README/CONTRIBUTING—scripts must run on macOS `/bin/bash 3.2` and the `codex-universal` container with only `jq` plus the Rust helpers that ship in `bin/` (sync them via `make build-bin`).
 - **Do not introduce new runtime dependencies beyond Bash, jq, and the existing Rust binaries.** If you need new behavior, express it in Bash/jq or extend the Rust helpers instead of pulling additional interpreters into the runtime path.
 - Canonicalize paths before enforcing workspace/probe boundaries. Use `bin/portable-path realpath|relpath` instead of rolling ad‑hoc `readlink`/`python` calls—mixed strategies are how regressions like probe path escapes reappear.
 - Keep new policy in machine artifacts (schemas, scripts, tests). Documentation and AGENTS files explain those artifacts; they do not replace them.
@@ -18,7 +18,7 @@
 - `probes/AGENTS.md` — Probe author contract: one observable action per script, cfbo-v1 emission rules, capability metadata selection.
 - `tests/AGENTS.md` — Structure of the test harness, fixture locations, and guidance for fast vs. second-tier suites.
   - `tests/audits/AGENTS.md` - Instructions for agents engaged in audits of the whole project or a subset of probes. 
-- `bin/AGENTS.md` — Guarantees for `fence-run`, `emit-record`, and `detect-stack`; keep their CLIs and stack metadata stable.
+- `src/bin/AGENTS.md` — Guarantees for the Rust helpers (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, etc.); keep their CLIs and stack metadata stable.
 - `lib/AGENTS.md` — Helper purity + one-function-per-file rule so probes/tests can source helpers safely.
 - `tools/AGENTS.md` — Capabilities adapter/validator contracts; reuse them instead of parsing `schema/capabilities.json` manually.
 - `docs/AGENTS.md` — How explanatory docs relate to machine contracts; update entries there whenever you add a new explainer.
@@ -26,7 +26,8 @@
 ## Directory map
 | Path | Purpose / Notes |
 | --- | --- |
-| `bin/` | Core entry points (`fence-run`, `emit-record`, `detect-stack`) plus the `codex-fence` CLI shims for bang/listen/test; orchestrate probe execution + record emission. |
+| `bin/` | Synced Rust binaries produced by `make build-bin`; keep them aligned with the sources under `src/bin/`. |
+| `src/bin/` | Rust implementations of `codex-fence`, `fence-run`, `emit-record`, `detect-stack`, `fence-bang/listen/test`, and `portable-path`. |
 | `lib/` | Single-function Bash helpers shared by probes/tests; pure, portable scripts. |
 | `tools/` | Capability adapters and validators invoked by bin/tests; keep metadata normalized. |
 | `probes/` | Flat directory of `<probe_id>.sh` scripts plus the probe author contract. |

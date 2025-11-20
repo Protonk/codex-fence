@@ -1,7 +1,7 @@
-use anyhow::{anyhow, bail, Context, Result};
-use codex_fence::find_repo_root;
+use anyhow::{Context, Result, anyhow, bail};
+use codex_fence::{find_repo_root, resolve_helper_binary};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -19,10 +19,7 @@ fn run() -> Result<()> {
     let args = CliArgs::parse()?;
     let repo_root = find_repo_root()?;
 
-    let detect_stack = repo_root.join("bin/detect-stack");
-    if !is_executable(&detect_stack) {
-        bail!("detect-stack helper not found at {}", detect_stack.display());
-    }
+    let detect_stack = resolve_helper_binary(&repo_root, "detect-stack")?;
 
     let capabilities_adapter = repo_root.join("tools/capabilities_adapter.sh");
     if !is_executable(&capabilities_adapter) {
@@ -145,7 +142,9 @@ impl CliArgs {
                 "--probe-name" | "--probe-id" => {
                     config.probe_name = Some(next_value(&mut args, arg.as_str())?)
                 }
-                "--probe-version" => config.probe_version = Some(next_value(&mut args, "--probe-version")?),
+                "--probe-version" => {
+                    config.probe_version = Some(next_value(&mut args, "--probe-version")?)
+                }
                 "--category" => config.category = Some(next_value(&mut args, "--category")?),
                 "--verb" => config.verb = Some(next_value(&mut args, "--verb")?),
                 "--target" => config.target = Some(next_value(&mut args, "--target")?),
@@ -164,20 +163,23 @@ impl CliArgs {
                         "raw-exit-code",
                     )?)
                 }
-                "--error-detail" => config.error_detail = Some(next_value(&mut args, "--error-detail")?),
+                "--error-detail" => {
+                    config.error_detail = Some(next_value(&mut args, "--error-detail")?)
+                }
                 "--payload-file" => {
                     let value = PathBuf::from(next_value(&mut args, "--payload-file")?);
                     config.payload_file = Some(value);
                 }
-                "--operation-args" => config.operation_args = Some(next_value(&mut args, "--operation-args")?),
+                "--operation-args" => {
+                    config.operation_args = Some(next_value(&mut args, "--operation-args")?)
+                }
                 "--primary-capability-id" => {
                     config.primary_capability_id =
                         Some(next_value(&mut args, "--primary-capability-id")?)
                 }
-                "--secondary-capability-id" => {
-                    config.secondary_capability_ids
-                        .push(next_value(&mut args, "--secondary-capability-id")?)
-                }
+                "--secondary-capability-id" => config
+                    .secondary_capability_ids
+                    .push(next_value(&mut args, "--secondary-capability-id")?),
                 "--command" => config.command = Some(next_value(&mut args, "--command")?),
                 "--help" | "-h" => {
                     print_usage();
@@ -280,9 +282,7 @@ fn parse_i64(value: String, label: &str) -> Result<i64> {
 fn validate_status(status: &str) -> Result<()> {
     match status {
         "success" | "denied" | "partial" | "error" => Ok(()),
-        other => bail!(
-            "Unknown status: {other} (expected success|denied|partial|error)"
-        ),
+        other => bail!("Unknown status: {other} (expected success|denied|partial|error)"),
     }
 }
 
@@ -346,22 +346,22 @@ fn validate_capability_id(
     if capabilities.contains_key(value) {
         return Ok(());
     }
-    bail!(
-        "Unknown {label}: {value}. Expected one of the IDs in schema/capabilities.json."
-    );
+    bail!("Unknown {label}: {value}. Expected one of the IDs in schema/capabilities.json.");
 }
 
 fn read_capabilities_schema_version(repo_root: &Path) -> Result<String> {
     let path = repo_root.join("schema/capabilities.json");
-    let contents = fs::read_to_string(&path)
-        .with_context(|| format!("Unable to read {}", path.display()))?;
+    let contents =
+        fs::read_to_string(&path).with_context(|| format!("Unable to read {}", path.display()))?;
     let value: Value = serde_json::from_str(&contents)
         .with_context(|| format!("Failed to parse JSON from {}", path.display()))?;
     let Some(raw) = value.get("schema_version").and_then(|v| v.as_str()) else {
         bail!("Unable to determine capabilities schema_version from schema/capabilities.json");
     };
     if !is_valid_schema_version(raw) {
-        bail!("Invalid capabilities schema_version: {raw}. Expected an alphanumeric string without spaces.");
+        bail!(
+            "Invalid capabilities schema_version: {raw}. Expected an alphanumeric string without spaces."
+        );
     }
     Ok(raw.to_string())
 }
@@ -450,9 +450,7 @@ fn resolve_workspace_root() -> Result<Option<String>> {
         .output()
     {
         if output.status.success() {
-            let candidate = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
+            let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !candidate.is_empty() {
                 return Ok(Some(candidate));
             }
