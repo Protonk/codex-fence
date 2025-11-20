@@ -25,11 +25,13 @@ silent on success, and deterministic.
    PROBE=<id>`). This runs `probe_contract/light_lint.sh` followed by
    `probe_contract/static_probe_contract.sh` for the resolved probe path.
 2. **Before sending a change** run `tests/run.sh`. It automatically lints every
-   probe, then executes the second-tier suites. Failures are summarized with a
-   `[FAIL]` line; re-run the failing script directly to iterate faster.
-3. **Debugging**: All suites are normal Bash scripts. Run them directly (e.g.
-   `tests/second_tier/harness_smoke.sh`) to reproduce failures. They only depend
-   on in-repo helpers.
+  probe, then executes the Rust second-tier integration tests via
+  `cargo test --test second_tier`. Re-run a focused test with, for example,
+  `cargo test --test second_tier capability_map_sync` to iterate faster.
+3. **Debugging**: The second-tier guard rails are standard Rust integration
+  tests. Use `cargo test --test second_tier <name>` (for example
+  `cargo test --test second_tier workspace_root_fallback`) to focus on one
+  failing case. They only depend on in-repo helpers.
 
 ## Library components
 
@@ -40,8 +42,8 @@ silent on success, and deterministic.
   reason about files under `probes/` or the workspace.
 - `tests/library/json_schema_validator.sh` is a hermetic JSON Schema validator
   implemented entirely with `jq`. It covers the subset of Draft-07 the harness
-  needs. Use it when validating emitted records against
-  `schema/boundary_object.json` (see the boundary object suite for usage).
+  needs and remains useful for ad-hoc checks even though the Rust suite now
+  validates the schema inline.
 - `tests/library/fixtures/probe_fixture.sh` is a self-contained probe used by the
   smoke suites. It writes to a temporary workspace and pipes a deterministic
   record into `bin/emit-record`. Prefer copying this file when you need a dummy
@@ -49,14 +51,17 @@ silent on success, and deterministic.
 
 ## Second-tier suite map
 
-| Script | Purpose | Notes |
+All guard rails now live in `tests/second_tier.rs` and run as Rust integration
+tests. Target a specific scenario with `cargo test --test second_tier <name>`.
+
+| Test | Purpose | Notes |
 | --- | --- | --- |
-| `second_tier/capability_map_sync.sh` | Confirms docs/data/probe_cap_coverage_map.json, tools/capabilities_adapter.sh, and probe metadata all reference the same capability ids. | Update docs + adapter when adding capabilities before rerunning this script. |
-| `second_tier/boundary_object_schema.sh` | Runs `bin/emit-record` with a fixture payload and validates the resulting JSON with `jq`. | Extend the jq expression whenever schema/boundary_object.json grows. |
-| `second_tier/harness_smoke.sh` | Runs the fixture probe via `bin/fence-run baseline` and checks the returned boundary object. | Keeps the baseline path honest; extend if fixtures gain new fields. |
-| `second_tier/baseline_no_codex_smoke.sh` | Temporarily hides the Codex CLI from `PATH` and asserts baseline runs still succeed while codex modes fail. | Make sure new smoke fixtures do not depend on `codex`. |
-| `second_tier/workspace_root_fallback.sh` | Executes the fixture probe with `FENCE_WORKSPACE_ROOT` cleared to confirm `bin/emit-record` falls back to `git rev-parse`/`pwd`. | Protects the documented workspace root fallback contract. |
-| `second_tier/probe_resolution_guards.sh` | Attempts to run `bin/fence-run` against paths/symlinks outside `probes/` and expects hard failures. | Use as a template for future negative guard-rail tests. |
+| `capability_map_sync` | Confirms docs/data/probe_cap_coverage_map.json, tools/capabilities_adapter.sh, and probe metadata all reference the same capability ids. | Update docs + adapter when adding capabilities before rerunning this check. |
+| `boundary_object_schema` | Runs `bin/emit-record` with a fixture payload and validates the resulting JSON plus the boundary object schema. | Extend the assertions and schema when the boundary_object contract grows. |
+| `harness_smoke_probe_fixture` | Runs the fixture probe via `bin/fence-run baseline` and checks the returned boundary object. | Keeps the baseline path honest; extend if fixtures gain new fields. |
+| `baseline_no_codex_smoke` | Temporarily hides the Codex CLI from `PATH` and asserts baseline runs still succeed while codex modes fail. | Make sure new smoke fixtures do not depend on `codex`. |
+| `workspace_root_fallback` | Executes the fixture probe with `FENCE_WORKSPACE_ROOT` cleared to confirm `bin/emit-record` falls back to `git rev-parse`/`pwd`. | Protects the documented workspace root fallback contract. |
+| `probe_resolution_guards` | Attempts to run `bin/fence-run` against paths/symlinks outside `probes/` and expects hard failures. | Use as a template for future negative guard-rail tests. |
 
 Add any heavier “whole repo” validation here. Follow the same structure: source
 `tests/library/utils.sh`, short-circuit on missing prerequisites, and print
@@ -71,13 +76,13 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
   (for syntax-only issues). This keeps the single-probe workflow fast.
 - **New fixtures:** Place them under `tests/library/fixtures/` so multiple suites
   can share them, and document any special behavior.
-- **New suites:** Put them under `tests/second_tier/` and add the filename (minus
-  `.sh`) to the `second_tier_suites` array in `tests/run.sh` so the orchestration
-  picks them up.
+- **New suites:** Add more Rust tests to `tests/second_tier.rs`. Keep them
+  hermetic, reuse the fixture helpers, and gate probe directory mutations with
+  the shared mutex already defined in that file.
 - **Negative harness tests:** When adding guard rails (path canonicalization,
-  workspace boundaries, etc.), follow the pattern used in
-  `second_tier/probe_resolution_guards.sh` to assert that failure modes remain
-  enforced.
+  workspace boundaries, etc.), follow the pattern used in the
+  `probe_resolution_guards` test inside `tests/second_tier.rs` to ensure failure
+  modes remain enforced.
 
 ## When things fail
 

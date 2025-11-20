@@ -46,17 +46,18 @@ valuable.
 ### Tests
 
 - `tests/run.sh` orchestrates two tiers: a fast lint/static-contract pass and
-  the second-tier suites (`capability_map_sync`, `boundary_object_schema`,
-  `harness_smoke`, `baseline_no_codex_smoke`). When expanding coverage, keep
-  the fast tier lightweight so `tests/run.sh --probe <id>` remains instant.
+  the Rust-based second-tier integration tests (`capability_map_sync`,
+  `boundary_object_schema`, `harness_smoke_probe_fixture`,
+  `baseline_no_codex_smoke`, etc.). When expanding coverage, keep the fast tier
+  lightweight so `tests/run.sh --probe <id>` remains instant.
 - The directory layout, fixtures, and suite expectations are captured in
   [`tests/AGENTS.md`](tests/AGENTS.md). Update that guide whenever you add a new
   suite or change workflows so agents know how to reproduce failures.
 - Place reusable fixtures under `tests/library/fixtures/` and keep them synced
   with the capability catalog (the validation scripts scan these files too).
-- Add new suites under `tests/second_tier/` when the checks are global or slow.
-  Ensure they short-circuit quickly on missing prerequisites so macOS authors
-  can still run `make test`.
+- Add new guard rails to `tests/second_tier.rs` when the checks are global or
+  slow. Ensure they short-circuit quickly on missing prerequisites so macOS
+  authors can still run `make test`.
 - Maintain the guard-rail block comment + inline notes that live at the top of
   each script. These comments are intentionally brief breadcrumbs so human and
   AI agents understand the purpose of a suite before editing it.

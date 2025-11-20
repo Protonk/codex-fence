@@ -26,9 +26,9 @@ fn run() -> Result<()> {
     };
 
     if cli.command == CommandTarget::Test {
-        let root = repo_root
-            .as_deref()
-            .context("codex-fence --test must run inside the codex-fence repository (set CODEX_FENCE_ROOT)")?;
+        let root = repo_root.as_deref().context(
+            "codex-fence --test must run inside the codex-fence repository (set CODEX_FENCE_ROOT)",
+        )?;
         run_cargo_tests(root)?;
     }
 

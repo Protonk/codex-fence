@@ -16,7 +16,8 @@ Usage: tests/run.sh [--probe <probe>]
 
 Without arguments, runs two tiers of checks:
   1. Fast tier: light lint + static probe contract
-  2. Full tier: capability map sync, schema validation, and harness smoke tests
+  2. Full tier: Rust integration tests that cover capability sync, schema validation,
+     and harness smoke scenarios
 
 Use --probe to run the fast tier against a single probe path or id.
 USAGE
@@ -57,25 +58,6 @@ if [[ ! -x "${light_lint_bin}" ]]; then
   exit 1
 fi
 
-run_suite() {
-  local label="$1"
-  local relative_path="$2"
-  local suite_script="${script_dir}/${relative_path}"
-  if [[ ! -x "${suite_script}" ]]; then
-    echo "Missing test script: ${suite_script}" >&2
-    return 1
-  fi
-  echo "Running ${label}..."
-  if "${suite_script}"; then
-    echo "${label}: PASS"
-  else
-    echo "${label}: FAIL"
-    return 1
-  fi
-  echo
-  return 0
-}
-
 if [[ -n "${probe_arg}" ]]; then
   # Resolve ids like "fs_outside_workspace" or relative paths to probes/<id>.sh.
   probe_script=$(resolve_probe_script_path "${REPO_ROOT}" "${probe_arg}" || true)
@@ -112,21 +94,7 @@ fi
 
 "${script_dir}/probe_contract/static_probe_contract.sh"
 
-second_tier_suites=(
-  "capability_map_sync"
-  "boundary_object_schema"
-  "harness_smoke"
-  "baseline_no_codex_smoke"
-  "workspace_root_fallback"
-  "probe_resolution_guards"
-)
-# Suites intentionally run in deterministic order so troubleshooting output is stable.
+echo "Running Rust second-tier guard rails..."
+cargo test --test second_tier
 
-status=0
-for suite in "${second_tier_suites[@]}"; do
-  if ! run_suite "${suite}" "second_tier/${suite}.sh"; then
-    status=1
-  fi
-done
-
-exit ${status}
+echo "Second-tier: PASS"

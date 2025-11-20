@@ -195,8 +195,9 @@ Probe development centers on a tight loop plus repo-wide guard rails:
 - `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints a single probe
   and enforces the static contract. Use this while editing.
 - `make test` runs `tests/run.sh` with no arguments, which first lints every
-  probe and then executes the second-tier suites (`capability_map_sync`,
-  `boundary_object_schema`, `harness_smoke`, `baseline_no_codex_smoke`, etc.).
+  probe and then executes the Rust second-tier integration tests in
+  `tests/second_tier.rs` (`capability_map_sync`, `boundary_object_schema`,
+  `harness_smoke_probe_fixture`, `baseline_no_codex_smoke`, etc.).
 - `make validate-capabilities` confirms that probes, fixtures, and stored
   boundary objects only reference cataloged capability IDs.
 
