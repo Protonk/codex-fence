@@ -25,12 +25,12 @@ Rather than doing things the clever or efficient way, we're trying something els
 
 We compile a machine readable catalog of security policy capabilities that we know exist: file system operations, network calls, and the like. Using this catalog we build dozens of tiny probes that hammer at each of these capabilities in different ways. Because we rigidly structure the output of the probes, many different kinds can come together to form a picture of what `codex` can and can't do. What's inside and outside the fence.
 
-This approach has obvious disadvantages. It is clearly inefficient--the repository structure is built around rapid AI generation of probes, some of which are silly or vacuous. In all likelyhood most will never contribute to useful signals about security. It is also **deeply** paranoid, perhaps needlessly so. Certainly past the point of diminishing returns.
+This approach has obvious disadvantages. It is clearly inefficient--the repository structure is built around rapid AI generation of probes, some of which are silly or vacuous. In all likelihood most will never contribute to useful signals about security. It is also **deeply** paranoid, perhaps needlessly so. Certainly past the point of diminishing returns.
 
 However, if we view these disadvantages as choices, benefits appear immediately:
 - What Codex can and can't do in your environment is always empirically determined. We don't need to trust `codex` or the os.
 - Running many probes is a defense against the security policy surface becoming unexpectedly more complex. Running so many and so many silly ones can (potentially) allow us to capture added complexity that's hard to anticipate.
-- With a rigid output structure, disparate probes can be integrated cleanly into signals about capabilities. Weird probes, paranoid probes, even pointless probes that don't add signal cannot contribute to noise. 
+- With a rigid output structure, disparate probes can be integrated cleanly into signals about capabilities. Weird probes, paranoid probes, even pointless probes that don't add signal cannot contribute to noise.
 
 ## How it works
 
@@ -77,7 +77,7 @@ See [docs/probes.md](docs/probes.md) for a complete walkthrough, including how
 
 ### DOES it work?!
 
-Yes! Provisonally! The capability catalog is for macOS only, but everything works identically on the `codex-universal` container and hopefully lots of other places.
+Yes! Provisionally! The capability catalog is for macOS only, but everything works identically on the `codex-universal` container and hopefully lots of other places.
 
 Once I decide on an API and freeze it I'll retract the "provisionally".
 
@@ -86,7 +86,9 @@ Once I decide on an API and freeze it I'll retract the "provisionally".
 | Path | Role |
 | --- | --- |
 | `probes/` | Executable probe scripts + author contract; each maps capabilities to observations. |
-| `bin/` | Synced Rust binaries produced by `make build-bin`; artifacts live here (git-ignored) so callers can run `bin/<helper>` directly. |
+| `src/bin/` | Rust source for the helper binaries (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, `portable-path`, `fence-bang/listen/test`). |
+| `src/` | Shared Rust modules for boundary objects and capability catalogs used by the binaries. |
+| `bin/` | Synced Rust binaries produced by `make build-bin` from `src/bin/`; artifacts live here (git-ignored) so callers can run `bin/<helper>` directly. |
 | `lib/` | Reserved for pure Bash helpers; most path logic now routes through the Rust helper in `bin/portable-path`. |
 | `tools/` | Capability adapters/validators that keep metadata consistent across scripts and tests. |
 | `schema/` | Machine-readable capability catalog and cfbo schema consumed by bin/tools/tests. |
@@ -102,15 +104,16 @@ any subdirectory.
 
 - POSIX shell utilities + `bash 3.2`
 - `jq`
-- `python3` (used by the network/process probes—keep the system interpreter around)
 - `make`
+- Rust toolchain (`cargo`/`rustc`) to build and sync the helper binaries and run the Rust integration tests
+- `python3` (used by the network/process probes—keep the system interpreter around)
 - The `codex` CLI (only if you plan to exercise Codex modes)
-- Rust toolchain (`cargo`/`rustc`) to build the CLI entrypoints
 
-The goal is to limit probe noise by keeping things lightweight and compatible
-with the toolchain shipped in macOS. Stock macOS + the `codex-universal`
-container already ship Python, so the only additional dependency to install
-manually is `jq`.
+The goal is to limit probe noise by keeping things lightweight: probes depend on
+Bash + `jq` and the Rust helpers synced into `bin/`. Fresh clones and test runs
+need a Rust toolchain because `make build-bin` and `cargo test` compile those
+helpers. Use the system `python3` for the probes that need it, and install `jq`
+if your OS does not bundle it.
 
 ## Building the helpers
 
@@ -122,9 +125,11 @@ make build-bin
 ```
 
 This command wraps `tools/sync_bin_helpers.sh`, which compiles the release
-binaries and copies them into `bin/` so every helper resolver
-can find them without depending on `target/{debug,release}`. Re-run it after
-pulling new commits or touching any code under `src/bin/`.
+binaries and copies them into `bin/` so every helper resolver can find them
+without depending on `target/{debug,release}`. The sync script also stamps
+`CODEX_FENCE_ROOT_HINT` into the binaries so installed CLIs can still locate
+the repository. Re-run it after pulling new commits or touching any code under
+`src/bin/`.
 
 ## Installation
 
