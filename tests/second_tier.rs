@@ -15,7 +15,7 @@ use std::process::{Command, Output};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use tempfile::{NamedTempFile, TempDir};
 
-const TEMP_PROBE_NAMES: &[&str] = &["tests_fixture_probe"];
+const TEMP_PROBE_NAMES: &[&str] = &["tests_fixture_probe", "tests_static_contract_broken"];
 
 #[test]
 fn capability_map_sync() -> Result<()> {
@@ -457,6 +457,73 @@ fn probe_resolution_guards() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn static_probe_contract_accepts_fixture() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
+
+    let mut cmd = Command::new(repo_root.join("tests/probe_contract/static_probe_contract.sh"));
+    cmd.arg("--probe").arg(fixture.probe_id());
+    let output = run_command(cmd)?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("[PASS]"),
+        "expected static contract to report PASS, stdout was: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn static_probe_contract_rejects_missing_strict_mode() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let contents = r#"#!/usr/bin/env bash
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
+emit_record_bin="${repo_root}/bin/emit-record"
+probe_name="tests_static_contract_broken"
+primary_capability_id="cap_fs_read_workspace_tree"
+"${emit_record_bin}" \
+  --run-mode "${FENCE_RUN_MODE:-baseline}" \
+  --probe-name "${probe_name}" \
+  --probe-version "1" \
+  --primary-capability-id "${primary_capability_id}" \
+  --command "true" \
+  --category "fs" \
+  --verb "read" \
+  --target "/dev/null" \
+  --status "success" \
+  --errno "" \
+  --message "fixture" \
+  --raw-exit-code "0" \
+  --payload-file /dev/null \
+  --operation-args "{}"
+"#;
+    let broken = FixtureProbe::install_from_contents(
+        &repo_root,
+        "tests_static_contract_broken",
+        contents,
+    )?;
+
+    let mut cmd = Command::new(repo_root.join("tests/probe_contract/static_probe_contract.sh"));
+    cmd.arg("--probe").arg(broken.probe_id());
+    let output = cmd
+        .output()
+        .context("failed to execute static probe contract")?;
+    assert!(
+        !output.status.success(),
+        "static contract should fail when strict mode is missing"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("set -euo pipefail"),
+        "expected strict-mode failure, stderr was: {stderr}"
+    );
+
+    Ok(())
+}
+
 struct CoverageEntry {
     has_probe: bool,
     raw_has_probe: Option<bool>,
@@ -483,6 +550,22 @@ impl FixtureProbe {
         }
         fs::copy(&source, &dest)
             .with_context(|| format!("failed to copy fixture to {}", dest.display()))?;
+        let mut perms = fs::metadata(&dest)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&dest, perms)?;
+        Ok(Self {
+            path: dest,
+            name: name.to_string(),
+        })
+    }
+
+    fn install_from_contents(repo_root: &Path, name: &str, contents: &str) -> Result<Self> {
+        let dest = repo_root.join("probes").join(format!("{name}.sh"));
+        if dest.exists() {
+            bail!("fixture already exists at {}", dest.display());
+        }
+        fs::write(&dest, contents)
+            .with_context(|| format!("failed to write fixture at {}", dest.display()))?;
         let mut perms = fs::metadata(&dest)?.permissions();
         perms.set_mode(0o755);
         fs::set_permissions(&dest, perms)?;

@@ -7,7 +7,7 @@
 
 ## Root expectations
 - Treat this file as a router: decide which subsystem you are editing, then obey the `*/AGENTS.md` in that directory so guidance stays layered instead of duplicated here.
-- Use the supported workflows: `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) for tight probe loops, `tests/run.sh`/`make test` for repo-wide checks, and `make matrix` when you need to exercise probes across modes.
+- Use the supported workflows: `tests/probe_contract/static_probe_contract.sh --probe <id>` (or `make probe PROBE=<id>`) for tight probe loops, `codex-fence --test` to sweep every probe contract, `cargo test --test second_tier` for guard rails, and `make matrix` when you need to exercise probes across modes.
 - `bin/codex-fence` is the top-level CLI for bang/listen/test and delegates to Rust helpers; keep it aligned with the Makefile defaults and existing harness scripts instead of reimplementing probe logic.
 - Preserve the portability stance described in README/CONTRIBUTING—scripts must run on macOS `/bin/bash 3.2` and the `codex-universal` container with only `jq` plus the Rust helpers that ship in `bin/` (sync them via `make build-bin`).
 - **Do not introduce new runtime dependencies beyond Bash, jq, and the existing Rust binaries.** If you need new behavior, express it in Bash/jq or extend the Rust helpers instead of pulling additional interpreters into the runtime path.
@@ -31,10 +31,10 @@
 | `lib/` | Single-function Bash helpers shared by probes/tests; pure, portable scripts. |
 | `tools/` | Capability adapters and validators invoked by bin/tests; keep metadata normalized. |
 | `probes/` | Flat directory of `<probe_id>.sh` scripts plus the probe author contract. |
-| `tests/` | Library helpers, fast-tier lint/static contract, and second-tier suites driven by `tests/run.sh`. |
+| `tests/` | Library helpers, the static probe contract, and Rust guard rails (`tests/second_tier.rs`). |
 | `docs/` | Human-readable explanations for schemas, probes, and boundary objects; cross-check with machine artifacts. |
 | `schema/` | Machine-readable capability catalog and boundary-object schema consumed by tooling. |
 | `out/` | Probe outputs (`<probe>.<mode>.json`) produced by `bin/fence-run`; inspect diffs here. |
 | `tmp/` | Scratch space for probe/test runs; safe to clean. |
-| `Makefile` | Convenience targets (`matrix`, `test`, `probe`) that tie bin/tools/tests together. |
+| `Makefile` | Convenience targets (`matrix`, `probe`, `validate-capabilities`) that tie bin/tools/tests together. |
 | `README.md` / `CONTRIBUTING.md` | Motivation plus repo-level contribution principles referenced above. |

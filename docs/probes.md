@@ -86,13 +86,12 @@ coerce bad output into a result.
 
 The fast authoring loop favors single-probe runs:
 
-- `tests/probe_contract/light_lint.sh probes/<id>.sh` runs the quick bash lint
-  pass against one script while you iterate on it.
-- `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints the target
-  script and enforces the static probe contract without touching the rest of
-  the suite.
-- `make test` runs the fast tier for every probe and then executes the second
-  tier (capability map sync, schema validation, harness smoke tests). Use this
-  before sending patches or running `make matrix`.
+- `tests/probe_contract/static_probe_contract.sh --probe probes/<id>.sh` runs
+  the interpreted, quick-fail contract (syntax + structural checks) while you
+  iterate on a single script.
+- `codex-fence --test` runs the static contract against every probe in the
+  repository.
+- `cargo test --test second_tier` covers the Rust guard rails (capability map
+  sync, schema validation, harness smoke tests, etc.).
 - `make validate-capabilities` checks that every probe, fixture, and stored
   boundary object references real capability ids.

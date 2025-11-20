@@ -6,27 +6,28 @@ tests.
 ## Mental model
 
 `tests/` enforces that probes and helpers stay portable and in sync with the
-public boundary-object schema. The directory is split into three layers:
+public boundary-object schema. The directory is split into four layers:
 
 | Layer | Entry point | Purpose |
 | --- | --- | --- |
 | Audits | `tests/audits/` | Agent instructions for conducting holistics and probe audits. |
 | Library | `tests/library/` | Shared Bash helpers + fixtures depended on by every suite. |
-| Fast tier | `tests/run.sh --probe <id>` | Syntax lint + static probe contract for one probe—the tight authoring loop. |
-| Second tier | `tests/run.sh` | Global checks that validate documentation, schema, and harness plumbing. |
+| Fast tier | `tests/probe_contract/` | Static probe contract (syntax + structural checks) for one probe—the tight authoring loop. |
+| Second tier | `tests/second_tier.rs` | Global checks that validate documentation, schema, and harness plumbing (run via `cargo test --test second_tier`). |
 
-The default make target `make test` simply runs `tests/run.sh` with no
-arguments, so anything added here must be portable (`/bin/bash 3.2` on macOS),
-silent on success, and deterministic.
+The static probe contract must stay portable (`/bin/bash 3.2` on macOS), silent
+on success, and deterministic. The Rust guard rails inherit the same
+expectations even though they run through Cargo.
 
 ## Quick start for agents
 
-1. **While editing a probe** use `tests/run.sh --probe <id>` (or `make probe
-   PROBE=<id>`). This runs `probe_contract/light_lint.sh` followed by
-   `probe_contract/static_probe_contract.sh` for the resolved probe path.
-2. **Before sending a change** run `tests/run.sh`. It automatically lints every
-  probe, then executes the Rust second-tier integration tests via
-  `cargo test --test second_tier`. Re-run a focused test with, for example,
+1. **While editing a probe** run
+  `tests/probe_contract/static_probe_contract.sh --probe <id>` (or
+  `make probe PROBE=<id>`). This invokes the interpreted contract tester for the
+  resolved probe path and surfaces syntax/structural issues immediately.
+2. **Before sending a change** run `codex-fence --test` to sweep the static
+  contract across every probe. Then execute the Rust integration tests with
+  `cargo test --test second_tier`. Re-run a focused guard rail with, for example,
   `cargo test --test second_tier capability_map_sync` to iterate faster.
 3. **Debugging**: The second-tier guard rails are standard Rust integration
   tests. Use `cargo test --test second_tier <name>` (for example
@@ -72,8 +73,8 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
 - **Guard-rail comments:** Every script now starts with a summary block—keep this
   habit so future agents know why a suite exists.
 - **New probe-level checks:** Extend `tests/probe_contract/static_probe_contract.sh`
-  (for structural, non-executing rules) or `tests/probe_contract/light_lint.sh`
-  (for syntax-only issues). This keeps the single-probe workflow fast.
+  when adding additional structural or syntax rules so the single-probe
+  workflow stays fast.
 - **New fixtures:** Place them under `tests/library/fixtures/` so multiple suites
   can share them, and document any special behavior.
 - **New suites:** Add more Rust tests to `tests/second_tier.rs`. Keep them

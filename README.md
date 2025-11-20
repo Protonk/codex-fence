@@ -93,7 +93,7 @@ Once I decide on an API and freeze it I'll retract the "provisionally".
 | `tools/` | Capability adapters/validators that keep metadata consistent across scripts and tests. |
 | `schema/` | Machine-readable capability catalog and cfbo schema consumed by bin/tools/tests. |
 | `docs/` | Human-readable explanations of catalogs, probes, and boundary objects; use alongside the schema files. |
-| `tests/` | Library helpers plus fast-tier and second-tier suites run through `tests/run.sh`; see [tests/AGENTS.md](tests/AGENTS.md). |
+| `tests/` | Library helpers plus the static probe contract and Rust guard rails; see [tests/AGENTS.md](tests/AGENTS.md). |
 | `out/` | Probe boundary objects, one JSON file per `<probe>.<mode>` run, ready for diffing. |
 | `Makefile` | Convenience targets (`matrix`, `test`, `probe`, `validate-capabilities`) that glue the harness together. |
 
@@ -154,8 +154,8 @@ Use `codex-fence` for the common workflows:
   `PROBES`/`MODES` overrides as `make matrix`.
 - `codex-fence --listen` consumes cfbo-v1 JSON from stdin and prints a
   human-readable summary of what succeeded or failed.
-- `codex-fence --test` runs `cargo test` and then executes the existing
-  `tests/run.sh` harness (mirrors `make test`).
+- `codex-fence --test` runs the static probe contract across every
+  `probes/*.sh` script.
 
 Pipeline example:
 
@@ -197,11 +197,11 @@ mode, Codex version, or host OS.
 
 Probe development centers on a tight loop plus repo-wide guard rails:
 
-- `tests/run.sh --probe <id>` (or `make probe PROBE=<id>`) lints a single probe
-  and enforces the static contract. Use this while editing.
-- `make test` runs `tests/run.sh` with no arguments, which first lints every
-  probe and then executes the Rust second-tier integration tests in
-  `tests/second_tier.rs` (`capability_map_sync`, `boundary_object_schema`,
+- `tests/probe_contract/static_probe_contract.sh --probe <id>` (or
+  `make probe PROBE=<id>`) runs the interpreted static contract for one probe.
+- `codex-fence --test` runs the same static contract across every probe.
+- `cargo test --test second_tier` executes the Rust guard rails
+  (`capability_map_sync`, `boundary_object_schema`,
   `harness_smoke_probe_fixture`, `baseline_no_codex_smoke`, etc.).
 - `make validate-capabilities` confirms that probes, fixtures, and stored
   boundary objects only reference cataloged capability IDs.

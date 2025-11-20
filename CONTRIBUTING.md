@@ -32,9 +32,9 @@ valuable.
   `bin/portable-path`, so prefer `portable-path realpath|relpath` instead of
   introducing interpreter fallbacks.
 - Project-level scripts (lint, validation, adapters) live under `tools/`.
-  The fast probe lint entry point, `tests/probe_contract/light_lint.sh`,
-  lives next to the static probe contract suite—prefer extending it for new
-  checks instead of duplicating logic elsewhere.
+- The fast probe contract entry point is
+  `tests/probe_contract/static_probe_contract.sh`; extend it for new
+  syntax/structural checks instead of duplicating logic elsewhere.
 - `bin/emit-record`, `bin/fence-run`, and any new helpers must avoid
   introducing runtime dependencies beyond Bash, `jq`, and the Rust standard
   library—keep probe plumbing lightweight and portable.
@@ -45,11 +45,15 @@ valuable.
 
 ### Tests
 
-- `tests/run.sh` orchestrates two tiers: a fast lint/static-contract pass and
-  the Rust-based second-tier integration tests (`capability_map_sync`,
+- The static probe contract lives at `tests/probe_contract/static_probe_contract.sh`.
+  Keep it lightweight so single-probe loops (`--probe <id>` or `make probe`)
+  remain instant, and remember that `codex-fence --test` now runs this helper
+  across every probe.
+- The Rust-based guard rails live in `tests/second_tier.rs` and run via
+  `cargo test --test second_tier` (`capability_map_sync`,
   `boundary_object_schema`, `harness_smoke_probe_fixture`,
-  `baseline_no_codex_smoke`, etc.). When expanding coverage, keep the fast tier
-  lightweight so `tests/run.sh --probe <id>` remains instant.
+  `baseline_no_codex_smoke`, etc.). When expanding coverage, keep these tests
+  hermetic and deterministic.
 - The directory layout, fixtures, and suite expectations are captured in
   [`tests/AGENTS.md`](tests/AGENTS.md). Update that guide whenever you add a new
   suite or change workflows so agents know how to reproduce failures.
@@ -57,7 +61,7 @@ valuable.
   with the capability catalog (the validation scripts scan these files too).
 - Add new guard rails to `tests/second_tier.rs` when the checks are global or
   slow. Ensure they short-circuit quickly on missing prerequisites so macOS
-  authors can still run `make test`.
+  authors can still iterate with `cargo test`.
 - Maintain the guard-rail block comment + inline notes that live at the top of
   each script. These comments are intentionally brief breadcrumbs so human and
   AI agents understand the purpose of a suite before editing it.

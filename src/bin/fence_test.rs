@@ -11,7 +11,7 @@ fn main() {
 
 fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
-    let script = repo_root.join("tests/run.sh");
+    let script = repo_root.join("tests/probe_contract/static_probe_contract.sh");
     let status = Command::new(&script)
         .current_dir(&repo_root)
         .stdin(Stdio::inherit())
@@ -24,7 +24,7 @@ fn run() -> Result<()> {
         Some(0) => Ok(()),
         Some(code) => std::process::exit(code),
         None => {
-            eprintln!("tests/run.sh terminated by signal");
+            eprintln!("static probe contract terminated by signal");
             std::process::exit(1);
         }
     }

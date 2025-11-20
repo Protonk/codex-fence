@@ -45,7 +45,7 @@ MODES ?= $(DEFAULT_MODES)
 MATRIX_TARGETS := $(foreach mode,$(MODES),$(addprefix $(OUTDIR)/,$(addsuffix .$(mode).json,$(PROBES))))
 
 # These targets do not correspond to files on disk.
-.PHONY: all matrix clean test validate-capabilities probe install build-bin
+.PHONY: all matrix clean validate-capabilities probe install build-bin
 
 # Default invocation runs the full probe matrix.
 all: matrix
@@ -80,17 +80,13 @@ $(foreach script,$(PROBE_SCRIPTS), \
 clean:
 	rm -rf $(OUTDIR)
 
-# Run the full lint + second-tier test suite (see tests/AGENTS.md for details).
-test:
-	tests/run.sh
-
 # Fast loop for a single probe. Requires PROBE=<probe_id_or_path>.
 probe:
 	@if [[ -z "$(PROBE)" ]]; then \
 		echo "Usage: make probe PROBE=<probe_id_or_path>"; \
 		exit 1; \
 	fi
-	tests/run.sh --probe "$(PROBE)"
+	tests/probe_contract/static_probe_contract.sh --probe "$(PROBE)"
 
 # Confirm capability metadata (schema, adapters, fixtures) remain in sync.
 validate-capabilities:

@@ -66,13 +66,14 @@ update these helpers together.
   - Reject invalid input with clear error messages; don’t panic.
 
 ### `fence-test`
-- **Purpose:** Run `tests/run.sh` while enforcing repo root detection and a
-  predictable environment.
+- **Purpose:** Execute `tests/probe_contract/static_probe_contract.sh` for the
+  full probe set while enforcing repo root detection and a predictable
+  environment.
 - **Expectations:**
-  - Keep the CLI simple; any extra flags should mirror `tests/run.sh`
-    capabilities.
+  - Keep the CLI simple; any extra flags should mirror the static contract
+    helper’s capabilities.
   - Surface script exit codes verbatim for CI consumption; `codex-fence --test`
-    now calls this binary after `cargo test` succeeds.
+    delegates directly to this binary.
 
 ## Shared helpers
 

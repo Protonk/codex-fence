@@ -4,7 +4,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 fn main() {
     if let Err(err) = run() {
@@ -24,13 +24,6 @@ fn run() -> Result<()> {
             None
         }
     };
-
-    if cli.command == CommandTarget::Test {
-        let root = repo_root.as_deref().context(
-            "codex-fence --test must run inside the codex-fence repository (set CODEX_FENCE_ROOT)",
-        )?;
-        run_cargo_tests(root)?;
-    }
 
     run_helper(&cli, repo_root.as_deref())
 }
@@ -92,7 +85,7 @@ impl Cli {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: codex-fence (--bang | --listen | --test) [args]\n\nCommands:\n  --bang, -b   Run the probe matrix and emit cfbo-v1 records to stdout (NDJSON).\n  --listen, -l Read cfbo-v1 JSON from stdin and print a human summary.\n  --test, -t   Run the repository tests.\n\nExample:\n  codex-fence --bang | codex-fence --listen"
+        "Usage: codex-fence (--bang | --listen | --test) [args]\n\nCommands:\n  --bang, -b   Run the probe matrix and emit cfbo-v1 records to stdout (NDJSON).\n  --listen, -l Read cfbo-v1 JSON from stdin and print a human summary.\n  --test, -t   Run the static probe contract across every probes/*.sh script.\n\nExample:\n  codex-fence --bang | codex-fence --listen"
     );
     std::process::exit(code);
 }
@@ -120,29 +113,6 @@ fn resolve_helper(name: &str, repo_root: Option<&Path>) -> Result<PathBuf> {
     bail!(
         "Unable to locate helper '{name}'. Run 'make build-bin' (or tools/sync_bin_helpers.sh) or set CODEX_FENCE_ROOT."
     )
-}
-
-fn run_cargo_tests(repo_root: &Path) -> Result<()> {
-    let cargo = env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
-    let display = cargo.to_string_lossy().into_owned();
-    let status = Command::new(&cargo)
-        .arg("test")
-        .current_dir(repo_root)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .with_context(|| format!("Failed to execute {display} test"))?;
-
-    if status.success() {
-        return Ok(());
-    }
-
-    if let Some(code) = status.code() {
-        std::process::exit(code);
-    }
-
-    bail!("cargo test terminated by signal")
 }
 
 fn run_helper(cli: &Cli, repo_root: Option<&Path>) -> Result<()> {
