@@ -9,15 +9,14 @@
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
-# Canonical list of run modes codex-fence supports. Update here when adding a
-# new mode so downstream bash helpers stay in sync.
 codex_fence_run_modes() {
-  printf '%s\n' "baseline" "codex-sandbox" "codex-full"
+  local modes=("baseline")
+  if command -v codex >/dev/null 2>&1; then
+    modes+=("codex-sandbox" "codex-full")
+  fi
+  printf '%s\n' "${modes[@]}"
 }
 
-# Mode resolver for contract-gate tooling. Respects PROBE_CONTRACT_MODES when
-# provided (space- or comma-separated), otherwise falls back to the canonical
-# list above.
 contract_gate_modes() {
   local override="${PROBE_CONTRACT_MODES:-}"
   if [[ -n "${override}" ]]; then

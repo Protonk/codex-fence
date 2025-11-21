@@ -16,6 +16,7 @@ repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 
 paths_helper="${repo_root}/tools/resolve_paths.sh"
 modes_helper="${repo_root}/tools/list_run_modes.sh"
+fence_run_bin="${repo_root}/bin/fence-run"
 
 if [[ ! -f "${paths_helper}" ]]; then
   echo "${gate_name}: missing path helper at ${paths_helper}" >&2
@@ -747,10 +748,22 @@ run_dynamic_gate() {
   local expected_primary_capability_id="$4"
   local run_mode="$5"
 
+  if [[ ! -x "${fence_run_bin}" ]]; then
+    echo "${gate_name}: missing fence-run helper at ${fence_run_bin}" >&2
+    return 1
+  fi
+
   local shadow_root
   shadow_root=$(mktemp -d "${TMPDIR:-/tmp}/probe-contract-shadow.XXXXXX")
 
   mkdir -p "${shadow_root}/bin" "${shadow_root}/probes" "${shadow_root}/tmp"
+  # Provide repo root sentinels expected by find_repo_root.
+  if [[ -f "${repo_root}/bin/.gitkeep" ]]; then
+    cp "${repo_root}/bin/.gitkeep" "${shadow_root}/bin/.gitkeep"
+  fi
+  if [[ -f "${repo_root}/Makefile" ]]; then
+    ln -s "${repo_root}/Makefile" "${shadow_root}/Makefile" 2>/dev/null || cp "${repo_root}/Makefile" "${shadow_root}/Makefile"
+  fi
 
   local probe_filename
   probe_filename=$(basename "${probe_path}")
@@ -784,21 +797,19 @@ run_dynamic_gate() {
 
   local path_prefix="${shadow_root}/bin:${PATH}"
 
-  local sandbox_mode=""
+  local modes_arg=()
   case "${run_mode}" in
-    baseline) sandbox_mode="";;
-    codex-sandbox) sandbox_mode="workspace-write";;
-    codex-full) sandbox_mode="danger-full-access";;
-    *) sandbox_mode="${run_mode}";;
+    baseline) modes_arg+=("baseline");;
+    codex-sandbox) modes_arg+=("codex-sandbox");;
+    codex-full) modes_arg+=("codex-full");;
+    *) modes_arg+=("${run_mode}");;
   esac
 
   local run_env=(env
     PATH="${path_prefix}"
     HOME="${shadow_root}"
     TMPDIR="${shadow_root}/tmp"
-    FENCE_RUN_MODE="${run_mode}"
-    FENCE_SANDBOX_MODE="${sandbox_mode}"
-    FENCE_WORKSPACE_ROOT="${shadow_root}"
+    CODEX_FENCE_ROOT="${shadow_root}"
     PROBE_CONTRACT_GATE_STATE_DIR="${stub_state}"
     PROBE_CONTRACT_EXPECTED_RUN_MODE="${run_mode}"
     PROBE_CONTRACT_CAPABILITIES_JSON="${repo_root}/schema/capabilities.json"
@@ -810,7 +821,9 @@ run_dynamic_gate() {
   if [[ -n "${expected_primary_capability_id}" ]]; then
     run_env+=("PROBE_CONTRACT_EXPECTED_PRIMARY_CAPABILITY_ID=${expected_primary_capability_id}")
   fi
-  run_env+=("${shadow_probe}")
+
+  # Run through fence-run so the gate matches real execution environment.
+  run_env+=("${fence_run_bin}" "--workspace-root" "${shadow_root}" "${run_mode}" "${shadow_probe}")
 
   if ! run_with_timeout 5 "${run_env[@]}" >"${probe_stdout}" 2>"${probe_stderr}"; then
     local exit_code=$?
@@ -907,16 +920,21 @@ gate_probe() {
   expected_primary_capability_id=$(extract_probe_var "${probe_path}" "primary_capability_id" || true)
 
   local modes=()
+  local mode_override="${PROBE_CONTRACT_MODES:-}"
   if [[ -n "${modes_arg}" ]]; then
-    printf '%s' "${modes_arg}" | tr ',' ' ' | tr -s ' ' '\n' | sed '/^[[:space:]]*$/d' | while read -r m; do
-      modes+=("${m}")
+    mode_override="${modes_arg}"
+  fi
+
+  if [[ -n "${mode_override}" ]]; then
+    local normalized
+    normalized=$(printf '%s' "${mode_override}" | tr ',' ' ' | tr -s ' ' ' ')
+    for m in ${normalized}; do
+      [[ -n "${m}" ]] && modes+=("${m}")
     done
-  else
-    if declare -F contract_gate_modes >/dev/null 2>&1; then
-      while IFS= read -r mode; do
-        [[ -n "${mode}" ]] && modes+=("${mode}")
-      done < <(contract_gate_modes)
-    fi
+  elif declare -F contract_gate_modes >/dev/null 2>&1; then
+    while IFS= read -r mode; do
+      [[ -n "${mode}" ]] && modes+=("${mode}")
+    done < <(contract_gate_modes)
   fi
   if [[ ${#modes[@]} -eq 0 ]]; then
     modes=("baseline" "codex-sandbox" "codex-full")
