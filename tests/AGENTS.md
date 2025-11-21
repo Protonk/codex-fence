@@ -12,12 +12,7 @@ public boundary-object schema. The directory is split into four layers:
 | --- | --- | --- |
 | Audits | `tests/audits/` | Agent instructions for conducting holistics and probe audits. |
 | Shims | `tests/shims/` | Shared Bash helpers + fixtures depended on by every suite. |
-| Fast tier | `tools/contract_gate/` | Static probe contract (syntax + structural checks) for one probe—the tight authoring loop. |
-| Second tier | `tests/suite.rs` | Global checks that validate documentation, schema, and harness plumbing (run via `cargo test --test suite`). |
-
-The static probe contract must stay portable (`/bin/bash 3.2` on macOS), silent
-on success, and deterministic. The Rust guard rails inherit the same
-expectations even though they run through Cargo.
+| Tests | `tests/suite.rs` | Global checks that validate documentation, schema, and harness plumbing (run via `cargo test --test suite`). |
 
 ## Quick start for agents
 
@@ -43,7 +38,7 @@ expectations even though they run through Cargo.
   record into `bin/emit-record`. Prefer copying this file when you need a dummy
   probe rather than inventing ad‑hoc scripts.
 
-## Second-tier suite map
+## suite map
 
 All guard rails now live in `tests/suite.rs` and run as Rust integration
 tests. Target a specific scenario with `cargo test --test suite <name>`.

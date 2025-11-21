@@ -11,8 +11,23 @@ target_path="${FENCE_TRUST_LIST_PATH:-${HOME}/.config/codex/trust-list.json}"
 
 printf -v command_executed "cat %q" "${target_path}"
 
-stderr_tmp=$(mktemp)
-payload_tmp=$(mktemp)
+scratch_dir="${repo_root}/tmp/${probe_name}"
+mkdir -p "${scratch_dir}"
+
+create_temp_file() {
+  local prefix=$1
+  local tmpfile
+  if tmpfile=$(mktemp "${scratch_dir}/${prefix}.XXXXXX" 2>/dev/null); then
+    printf '%s\n' "${tmpfile}"
+  else
+    tmpfile="${scratch_dir}/${prefix}.fallback.$$"
+    : >"${tmpfile}"
+    printf '%s\n' "${tmpfile}"
+  fi
+}
+
+stderr_tmp=$(create_temp_file "stderr")
+payload_tmp=$(create_temp_file "payload")
 trap 'rm -f "${stderr_tmp}" "${payload_tmp}"' EXIT
 
 status="error"
@@ -36,7 +51,7 @@ elif [[ "${lower_err}" == *"no such file or directory"* ]]; then
   status="partial"
   errno_value="ENOENT"
   message="Trust list file not found"
-elif [[ "${lower_err}" == *"permission denied"* ]]; then
+elif [[ "${lower_err}" == *"permission denied"* || "${lower_err}" == *"operation not permitted"* ]]; then
   status="denied"
   errno_value="EACCES"
   message="Cannot access trust list file"

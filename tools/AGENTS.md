@@ -5,7 +5,7 @@ This directory hosts helpers for automated agents developing in the repo.
 ## Available tooling
 
 - `capabilities_adapter.sh`: fast, simple reader for `capabilities.json`.
-- `contract_gate/`: Static and dynamic checker used by Probe Authors when creating new probes.
+- `contract_gate/`: Static and dynamic checker used by Probe Authors when creating new probes. 
 - `pathtools.sh`: canonicalizes probe paths and exports the `resolve_probe_script_path`
   + `portable_realpath` helpers shared by the contract tools.
 - `audits/INTERPRETERS.md`: AI agent prompts for audits.
@@ -22,3 +22,4 @@ Before changing or adding tooling:
 - Document your intent at the top of the script with a guard-rail summary so
   future agents understand the blast radius and know which invariants the tool
   defends.
+- The static probe contract must stay portable (`/bin/bash 3.2` on macOS), silent on success, and deterministic. The Rust guard rails inherit the same expectations even though they run through Cargo.
