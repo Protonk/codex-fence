@@ -91,8 +91,7 @@ Once I decide on an API and freeze it I'll retract the "provisionally".
 | `src/bin/` | Rust source for the helper binaries (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, `portable-path`, `fence-bang/listen/test`). |
 | `src/` | Shared Rust modules for boundary objects and capability catalogs used by the binaries. |
 | `bin/` | Synced Rust binaries produced by `make build-bin` from `src/bin/`; artifacts live here (git-ignored) so callers can run `bin/<helper>` directly. |
-| `lib/` | Reserved for pure Bash helpers; most path logic now routes through the Rust helper in `bin/portable-path`. |
-| `tools/` | Capability adapters/validators that keep metadata consistent across scripts and tests. |
+| `tools/` | Helpers for agents in the Probe Author role. |
 | `schema/` | Machine-readable capability catalog and cfbo schema consumed by bin/tools/tests. |
 | `docs/` | Human-readable explanations of catalogs, probes, and boundary objects; use alongside the schema files. |
 | `tests/` | Library helpers plus the static probe contract and Rust guard rails; see [tests/AGENTS.md](tests/AGENTS.md). |
