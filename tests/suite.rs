@@ -421,6 +421,84 @@ primary_capability_id="cap_fs_read_workspace_tree"
     Ok(())
 }
 
+// Ensures probe-contract-gate fails fast when static issues are present.
+#[test]
+fn contract_gate_rejects_static_violation() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let contents = r#"#!/usr/bin/env bash
+probe_name="tests_contract_gate_static_violation"
+primary_capability_id="cap_fs_read_workspace_tree"
+exit 0
+"#;
+    let broken =
+        FixtureProbe::install_from_contents(&repo_root, "tests_contract_gate_static_violation", contents)?;
+
+    let mut cmd = Command::new(repo_root.join("bin/probe-contract-gate"));
+    cmd.arg(broken.probe_id());
+    let output = cmd.output().context("failed to execute probe-contract-gate")?;
+    assert!(
+        !output.status.success(),
+        "probe-contract-gate should fail when static contract is violated"
+    );
+    Ok(())
+}
+
+// Confirms probe-contract-gate runs the fixture probe through the dynamic gate.
+#[test]
+fn contract_gate_dynamic_accepts_fixture() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
+
+    let mut cmd = Command::new(repo_root.join("bin/probe-contract-gate"));
+    cmd.arg(fixture.probe_id());
+    let output = run_command(cmd)?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("probe_contract_gate"),
+        "expected stub validation output in stdout, got: {stdout}"
+    );
+    Ok(())
+}
+
+// Verifies the dynamic gate detects probes that skip emit-record entirely.
+#[test]
+fn contract_gate_dynamic_flags_missing_emit_record() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let contents = r#"#!/usr/bin/env bash
+set -euo pipefail
+
+probe_name="tests_contract_gate_missing_emit"
+primary_capability_id="cap_fs_read_workspace_tree"
+
+# Intentionally skip emit-record to trigger dynamic gate failure.
+exit 0
+"#;
+    let broken = FixtureProbe::install_from_contents(
+        &repo_root,
+        "tests_contract_gate_missing_emit",
+        contents,
+    )?;
+
+    let mut cmd = Command::new(repo_root.join("bin/probe-contract-gate"));
+    cmd.arg(broken.probe_id());
+    let output = cmd
+        .output()
+        .context("failed to execute probe-contract-gate for missing emit-record fixture")?;
+    assert!(
+        !output.status.success(),
+        "dynamic gate should fail when emit-record is never called"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("emit-record not called") || stderr.contains("dynamic gate failed"),
+        "expected dynamic gate failure message, stderr was: {stderr}"
+    );
+    Ok(())
+}
+
 // Helper for installing temporary probe shims under probes/ and cleaning them
 // up after each test.
 struct FixtureProbe {

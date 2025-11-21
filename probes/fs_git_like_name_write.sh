@@ -20,62 +20,167 @@ probe_name="fs_git_like_name_write"
 probe_version="1"
 primary_capability_id="cap_fs_read_git_metadata"
 
-workspace_fake_root=$(mktemp -d "${repo_root}/tmp_git_like_name.XXXXXX")
+probe_tmp_root="${repo_root}/tmp/fs_git_like_name_write"
+mkdir -p "${probe_tmp_root}" 2>/dev/null || true
+unique_suffix="$(date -u +%s%N).$$"
+
+safe_tmp_file() {
+  local label="$1"
+  local candidates=()
+  if [[ -d "${probe_tmp_root}" ]]; then
+    candidates+=("${probe_tmp_root}")
+  fi
+  if [[ -n "${TMPDIR:-}" ]]; then
+    candidates+=("${TMPDIR%/}")
+  fi
+  candidates+=("/tmp")
+
+  local dir path
+  for dir in "${candidates[@]}"; do
+    if [[ -z "${dir}" ]]; then
+      continue
+    fi
+    if mkdir -p "${dir}" 2>/dev/null; then
+      if path=$(TMPDIR="${dir}" mktemp "${label}.${unique_suffix}.XXXXXX" 2>/dev/null); then
+        printf '%s\n' "${path}"
+        return 0
+      fi
+    fi
+  done
+  printf ''
+  return 1
+}
+
+workspace_fake_root_template="${probe_tmp_root}/workspace.XXXXXX"
+workspace_fake_root=""
+workspace_setup_ok="true"
+mktemp_exit_code=0
+
 project_segment="project.git-like"
 git_like_component=".git-shadow"
-target_dir="${workspace_fake_root}/${project_segment}/${git_like_component}/objects"
-mkdir -p "${target_dir}"
-target_file="${target_dir}/write_probe.txt"
 
 timestamp=$(date -u +"%Y%m%dT%H%M%SZ")
 attempt_line="git-like name write ${timestamp}"
 attempt_bytes=$(( ${#attempt_line} + 1 ))
-printf -v command_executed "printf %q >> %q" "${attempt_line}" "${target_file}"
 
-stdout_tmp=$(mktemp)
-stderr_tmp=$(mktemp)
-payload_tmp=$(mktemp)
+stdout_tmp=$(safe_tmp_file "stdout")
+stderr_tmp=$(safe_tmp_file "stderr")
+payload_tmp=$(safe_tmp_file "payload")
+mktemp_error_tmp=$(safe_tmp_file "mktemp_error")
 cleanup() {
-  rm -f "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}"
-  rm -rf "${workspace_fake_root}"
+  for candidate in "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}" "${mktemp_error_tmp}"; do
+    if [[ -n "${candidate}" && -f "${candidate}" ]]; then
+      rm -f "${candidate}" || true
+    fi
+  done
+  if [[ -n "${workspace_fake_root}" ]]; then
+    rm -rf "${workspace_fake_root}"
+  fi
 }
 trap cleanup EXIT
+
+if workspace_fake_root=$(mktemp -d "${workspace_fake_root_template}" 2>"${mktemp_error_tmp:-/dev/null}"); then
+  workspace_setup_ok="true"
+else
+  workspace_setup_ok="false"
+  mktemp_exit_code=$?
+fi
+
+target_root="${workspace_fake_root:-${workspace_fake_root_template}}"
+target_dir="${target_root}/${project_segment}/${git_like_component}/objects"
+target_file="${target_dir}/write_probe.txt"
 
 status="error"
 errno_value=""
 message=""
 raw_exit_code=""
+stdout_text=""
+stderr_text=""
+command_executed="(not attempted)"
 
-set +e
-{
-  printf '%s\n' "${attempt_line}" >>"${target_file}"
-} >"${stdout_tmp}" 2>"${stderr_tmp}"
-exit_code=$?
-set -e
-raw_exit_code="${exit_code}"
-stdout_text=$(tr -d '\0' <"${stdout_tmp}")
-stderr_text=$(tr -d '\0' <"${stderr_tmp}")
+if [[ "${workspace_setup_ok}" == "true" ]]; then
+  printf -v command_executed "mkdir -p %q" "${target_dir}"
+  set +e
+  mkdir -p "${target_dir}" 2>"${stderr_tmp:-/dev/null}"
+  mkdir_status=$?
+  set -e
 
-if [[ ${exit_code} -eq 0 ]]; then
-  status="success"
-  message="Write inside git-like directory succeeded"
+  if [[ ${mkdir_status} -ne 0 ]]; then
+    raw_exit_code="${mkdir_status}"
+    if [[ -n "${stderr_tmp}" && -f "${stderr_tmp}" ]]; then
+      stderr_text=$(tr -d '\0' <"${stderr_tmp}" 2>/dev/null || true)
+    fi
+    lower_err=$(printf '%s' "${stderr_text}" | tr 'A-Z' 'a-z')
+    if [[ "${lower_err}" == *"permission denied"* ]]; then
+      status="denied"
+      errno_value="EACCES"
+      message="Permission denied creating git-like directory"
+    elif [[ "${lower_err}" == *"operation not permitted"* ]]; then
+      status="denied"
+      errno_value="EPERM"
+      message="Operation not permitted creating git-like directory"
+    else
+      status="error"
+      message="Failed to create git-like directory"
+    fi
+  else
+    printf -v command_executed "printf %q >> %q" "${attempt_line}" "${target_file}"
+
+    set +e
+    {
+      printf '%s\n' "${attempt_line}" >>"${target_file}"
+    } >"${stdout_tmp:-/dev/null}" 2>"${stderr_tmp:-/dev/null}"
+    exit_code=$?
+    set -e
+    raw_exit_code="${exit_code}"
+    if [[ -n "${stdout_tmp}" && -f "${stdout_tmp}" ]]; then
+      stdout_text=$(tr -d '\0' <"${stdout_tmp}" 2>/dev/null || true)
+    fi
+    if [[ -n "${stderr_tmp}" && -f "${stderr_tmp}" ]]; then
+      stderr_text=$(tr -d '\0' <"${stderr_tmp}" 2>/dev/null || true)
+    fi
+
+    if [[ ${exit_code} -eq 0 ]]; then
+      status="success"
+      message="Write inside git-like directory succeeded"
+    else
+      lower_err=$(printf '%s' "${stderr_text}" | tr 'A-Z' 'a-z')
+      if [[ "${lower_err}" == *"permission denied"* ]]; then
+        status="denied"
+        errno_value="EACCES"
+        message="Permission denied writing inside git-like directory"
+      elif [[ "${lower_err}" == *"operation not permitted"* ]]; then
+        status="denied"
+        errno_value="EPERM"
+        message="Operation not permitted inside git-like directory"
+      elif [[ "${lower_err}" == *"no such file or directory"* ]]; then
+        status="error"
+        errno_value="ENOENT"
+        message="Git-like directory missing"
+      else
+        status="error"
+        message="Git-like write failed with exit code ${exit_code}"
+      fi
+    fi
+  fi
 else
+  command_executed=$(printf "mktemp -d %q" "${workspace_fake_root_template}")
+  raw_exit_code="${mktemp_exit_code}"
+  if [[ -n "${mktemp_error_tmp}" && -f "${mktemp_error_tmp}" ]]; then
+    stderr_text=$(tr -d '\0' <"${mktemp_error_tmp}" 2>/dev/null || true)
+  fi
   lower_err=$(printf '%s' "${stderr_text}" | tr 'A-Z' 'a-z')
   if [[ "${lower_err}" == *"permission denied"* ]]; then
     status="denied"
     errno_value="EACCES"
-    message="Permission denied writing inside git-like directory"
+    message="Permission denied creating git-like workspace"
   elif [[ "${lower_err}" == *"operation not permitted"* ]]; then
     status="denied"
     errno_value="EPERM"
-    message="Operation not permitted inside git-like directory"
-  elif [[ "${lower_err}" == *"no such file or directory"* ]]; then
-    status="error"
-    errno_value="ENOENT"
-    message="Git-like directory missing"
+    message="Operation not permitted creating git-like workspace"
   else
     status="error"
-    message="Git-like write failed with exit code ${exit_code}"
+    message="Failed to create git-like workspace"
   fi
 fi
 
@@ -105,6 +210,15 @@ if [[ -f "${target_file}" ]]; then
   target_size=$(wc -c <"${target_file}" | tr -d '[:space:]')
 fi
 
+workspace_created_json="false"
+if [[ "${workspace_setup_ok}" == "true" ]]; then
+  workspace_created_json="true"
+fi
+workspace_error_text=""
+if [[ "${workspace_setup_ok}" != "true" ]]; then
+  workspace_error_text="${stderr_text}"
+fi
+
 raw_payload=$(jq -n \
   --arg target_file "${target_file}" \
   --arg target_realpath "${target_realpath}" \
@@ -112,49 +226,71 @@ raw_payload=$(jq -n \
   --arg project_segment "${project_segment}" \
   --arg git_dir "${git_dir_realpath}" \
   --arg target_size "${target_size}" \
+  --arg workspace_root "${workspace_fake_root}" \
+  --arg workspace_template "${workspace_fake_root_template}" \
+  --arg workspace_error "${workspace_error_text}" \
+  --argjson workspace_created "${workspace_created_json}" \
   '{
     target_file: $target_file,
     target_realpath: $target_realpath,
     git_like_component: $git_like_component,
     project_segment: $project_segment,
     git_dir_realpath: (if ($git_dir | length) > 0 then $git_dir else null end),
-    resulting_size: (if ($target_size | length) > 0 then ($target_size | tonumber) else null end)
+    resulting_size: (if ($target_size | length) > 0 then ($target_size | tonumber) else null end),
+    workspace_created: $workspace_created,
+    workspace_root: (if $workspace_created then $workspace_root else null end),
+    workspace_root_template: $workspace_template,
+    workspace_error: (if ($workspace_error | length) > 0 then $workspace_error else null end)
   }')
 
-jq -n \
-  --arg stdout_snippet "${stdout_snippet}" \
-  --arg stderr_snippet "${stderr_snippet}" \
-  --argjson raw "${raw_payload}" \
-  '{stdout_snippet: (if ($stdout_snippet | length) > 0 then $stdout_snippet else "" end),
-    stderr_snippet: (if ($stderr_snippet | length) > 0 then $stderr_snippet else "" end),
-    raw: $raw}' >"${payload_tmp}"
+payload_file_path=""
+if [[ -n "${payload_tmp}" ]]; then
+  jq -n \
+    --arg stdout_snippet "${stdout_snippet}" \
+    --arg stderr_snippet "${stderr_snippet}" \
+    --argjson raw "${raw_payload}" \
+    '{stdout_snippet: (if ($stdout_snippet | length) > 0 then $stdout_snippet else "" end),
+      stderr_snippet: (if ($stderr_snippet | length) > 0 then $stderr_snippet else "" end),
+      raw: $raw}' >"${payload_tmp}"
+  if [[ -f "${payload_tmp}" ]]; then
+    payload_file_path="${payload_tmp}"
+  fi
+fi
 
 operation_args=$(jq -n \
   --arg target_path "${target_file}" \
   --arg git_like_component "${git_like_component}" \
   --arg project_segment "${project_segment}" \
   --argjson attempt_bytes "${attempt_bytes}" \
+  --argjson workspace_created "${workspace_created_json}" \
   '{
     target_path: $target_path,
     git_like_component: $git_like_component,
     sibling_project_segment: $project_segment,
     attempt_bytes: $attempt_bytes,
     write_mode: "append",
-    looks_like_git: true
+    looks_like_git: true,
+    workspace_created: $workspace_created
   }')
 
-"${emit_record_bin}" \
-  --run-mode "${run_mode}" \
-  --probe-name "${probe_name}" \
-  --probe-version "${probe_version}" \
-  --primary-capability-id "${primary_capability_id}" \
-  --command "${command_executed}" \
-  --category "fs" \
-  --verb "write" \
-  --target "${target_file}" \
-  --status "${status}" \
-  --errno "${errno_value}" \
-  --message "${message}" \
-  --raw-exit-code "${raw_exit_code}" \
-  --payload-file "${payload_tmp}" \
+emit_args=(
+  --run-mode "${run_mode}"
+  --probe-name "${probe_name}"
+  --probe-version "${probe_version}"
+  --primary-capability-id "${primary_capability_id}"
+  --command "${command_executed}"
+  --category "fs"
+  --verb "write"
+  --target "${target_file}"
+  --status "${status}"
+  --errno "${errno_value}"
+  --message "${message}"
+  --raw-exit-code "${raw_exit_code}"
   --operation-args "${operation_args}"
+)
+
+if [[ -n "${payload_file_path}" ]]; then
+  emit_args+=(--payload-file "${payload_file_path}")
+fi
+
+"${emit_record_bin}" "${emit_args[@]}"

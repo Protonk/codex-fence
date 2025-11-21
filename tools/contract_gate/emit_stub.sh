@@ -45,6 +45,8 @@ required_primary_capability_id=""
 required_run_mode=${PROBE_CONTRACT_EXPECTED_RUN_MODE:-}
 required_probe_name=${PROBE_CONTRACT_EXPECTED_PROBE_NAME:-}
 required_primary_capability_id=${PROBE_CONTRACT_EXPECTED_PRIMARY_CAPABILITY_ID:-}
+capabilities_json=${PROBE_CONTRACT_CAPABILITIES_JSON:-}
+capabilities_adapter=${PROBE_CONTRACT_CAPABILITIES_ADAPTER:-}
 
 ensure_jq() {
   if ! command -v jq >/dev/null 2>&1; then
@@ -251,6 +253,15 @@ fi
 
 if ! printf '%s' "${operation_args}" | jq -e 'type == "object"' >/dev/null 2>&1; then
   fail "--operation-args must be a JSON object"
+fi
+
+if [[ -n "${capabilities_json}" && -n "${capabilities_adapter}" && -x "${capabilities_adapter}" && -f "${capabilities_json}" ]]; then
+  if ! capability_map=$("${capabilities_adapter}" "${capabilities_json}" 2>/dev/null); then
+    fail "capability catalog validation failed"
+  fi
+  if ! printf '%s' "${capability_map}" | jq -e --arg id "${primary_capability_id}" 'has($id)' >/dev/null 2>&1; then
+    fail "unknown primary_capability_id '${primary_capability_id}'"
+  fi
 fi
 
 printf 'ok\n' >"${status_file}"

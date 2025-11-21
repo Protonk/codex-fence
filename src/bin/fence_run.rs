@@ -29,12 +29,19 @@ fn run() -> Result<()> {
     let workspace_plan = determine_workspace_plan(&workspace_root, args.workspace_override)?;
     let resolved_probe = resolve_probe(&workspace_root, &args.probe_name)?;
     ensure_probe_executable(&resolved_probe.path)?;
+    let workspace_tmpdir = workspace_tmpdir(&workspace_root);
 
     let sandbox_mode = sandbox_mode_for_mode(&args.run_mode)?;
     let platform = detect_platform().unwrap_or_else(|| env::consts::OS.to_string());
     let command_spec = build_command_spec(&args.run_mode, &platform, &resolved_probe.path)?;
 
-    run_command(command_spec, &args.run_mode, &sandbox_mode, &workspace_plan)?;
+    run_command(
+        command_spec,
+        &args.run_mode,
+        &sandbox_mode,
+        &workspace_plan,
+        workspace_tmpdir.as_deref(),
+    )?;
     Ok(())
 }
 
@@ -168,6 +175,17 @@ fn canonicalize_os_string(value: &OsString) -> OsString {
         .into_os_string()
 }
 
+/// Prefer a workspace-scoped tmp dir so probes land temp files inside the
+/// allowed tree even when system defaults are blocked.
+fn workspace_tmpdir(workspace_root: &Path) -> Option<PathBuf> {
+    let candidate = workspace_root.join("tmp");
+    if fs::create_dir_all(&candidate).is_ok() {
+        Some(canonicalize_path(&candidate))
+    } else {
+        None
+    }
+}
+
 fn ensure_probe_executable(path: &Path) -> Result<()> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("Probe not found or not executable: {}", path.display()))?;
@@ -287,6 +305,7 @@ fn run_command(
     run_mode: &str,
     sandbox_mode: &OsString,
     workspace_plan: &WorkspacePlan,
+    workspace_tmpdir: Option<&Path>,
 ) -> Result<()> {
     let mut command = Command::new(&spec.program);
     for arg in &spec.args {
@@ -296,6 +315,9 @@ fn run_command(
     command.env("FENCE_SANDBOX_MODE", sandbox_mode);
     if let Some(value) = workspace_plan.export_value.as_ref() {
         command.env("FENCE_WORKSPACE_ROOT", value);
+    }
+    if let Some(tmpdir) = workspace_tmpdir {
+        command.env("TMPDIR", tmpdir);
     }
 
     let status = command
@@ -352,6 +374,16 @@ mod tests {
                 .to_string_lossy()
                 .contains("probes")
         );
+    }
+
+    #[test]
+    fn workspace_tmpdir_prefers_workspace_tree() {
+        let workspace = TempWorkspace::new();
+        let canonical_root = canonicalize_path(&workspace.root);
+        let tmpdir = workspace_tmpdir(&canonical_root).expect("tmpdir");
+        assert!(tmpdir.starts_with(&canonical_root));
+        assert!(tmpdir.ends_with("tmp"));
+        assert!(tmpdir.is_dir());
     }
 
     struct TempWorkspace {
