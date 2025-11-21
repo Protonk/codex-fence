@@ -11,12 +11,13 @@ marker_var="CODEX_SANDBOX_ENV_VAR"
 printf -v command_executed "printenv %s" "${marker_var}"
 
 tmp_dir="${repo_root}/tmp/${probe_name}"
-mkdir -p "${tmp_dir}"
+tmp_run_dir="${tmp_dir}/run.$$.$RANDOM"
+mkdir -p "${tmp_run_dir}"
 
-stdout_tmp=$(mktemp "${tmp_dir}/stdout.XXXXXX")
-stderr_tmp=$(mktemp "${tmp_dir}/stderr.XXXXXX")
-payload_tmp=$(mktemp "${tmp_dir}/payload.XXXXXX")
-trap 'rm -f "${stdout_tmp}" "${stderr_tmp}" "${payload_tmp}"' EXIT
+stdout_tmp="${tmp_run_dir}/stdout"
+stderr_tmp="${tmp_run_dir}/stderr"
+payload_tmp="${tmp_run_dir}/payload.json"
+trap 'rm -rf "${tmp_run_dir}"' EXIT
 
 status="error"
 errno_value=""
