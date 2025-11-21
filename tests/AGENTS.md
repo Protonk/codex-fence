@@ -39,10 +39,10 @@ expectations even though they run through Cargo.
   path logic. It shells out to `bin/portable-path realpath` so probe paths are
   canonicalized before prefix checks—reuse that helper whenever you need to
   reason about files under `probes/` or the workspace.
-- `tests/library/json_schema_validator.sh` is a hermetic JSON Schema validator
-  implemented entirely with `jq`. It covers the subset of Draft-07 the harness
-  needs and remains useful for ad-hoc checks even though the Rust suite now
-  validates the schema inline.
+- Schema validation now lives entirely in the Rust guard rails—run
+  `cargo test --test second_tier boundary_object_schema` to lint the emitted
+  boundary object against `schema/boundary_object.json` with the `jsonschema`
+  crate.
 - `tests/library/fixtures/probe_fixture.sh` is a self-contained probe used by the
   smoke suites. It writes to a temporary workspace and pipes a deterministic
   record into `bin/emit-record`. Prefer copying this file when you need a dummy
