@@ -8,16 +8,10 @@ repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 
 static_gate="${repo_root}/tools/contract_gate/static_gate.sh"
 stub_template="${repo_root}/tools/contract_gate/emit_stub.sh"
-portable_path="${repo_root}/bin/portable-path"
-utils_path="${repo_root}/tests/library/utils.sh"
+pathtools_path="${repo_root}/tools/pathtools.sh"
 
 contract_run_mode="contract_check"
 timeout_seconds=5
-
-if [[ ! -x "${portable_path}" ]]; then
-  echo "probe-contract-gate: missing portable-path helper at ${portable_path}" >&2
-  exit 1
-fi
 
 if [[ ! -x "${static_gate}" ]]; then
   echo "probe-contract-gate: static gate not found at ${static_gate}" >&2
@@ -30,18 +24,40 @@ if [[ ! -f "${stub_template}" ]]; then
 fi
 
 export REPO_ROOT="${repo_root}"
-if [[ -f "${utils_path}" ]]; then
-  # shellcheck disable=SC1090
-  source "${utils_path}"
-fi
-
-if ! declare -F resolve_probe_script_path >/dev/null 2>&1; then
-  echo "probe-contract-gate: resolve_probe_script_path helper is unavailable" >&2
+if [[ -f "${pathtools_path}" ]]; then
+  # shellcheck source=/dev/null
+  source "${pathtools_path}"
+else
+  echo "probe-contract-gate: missing path helper at ${pathtools_path}" >&2
   exit 1
 fi
 
-if ! declare -F extract_probe_var >/dev/null 2>&1; then
-  echo "probe-contract-gate: extract_probe_var helper is unavailable" >&2
+extract_probe_var() {
+  local file="$1"
+  local var="$2"
+  local line value trimmed first last value_length
+  line=$(grep -E "^[[:space:]]*${var}=" "$file" | head -n1 || true)
+  if [[ -z "${line}" ]]; then
+    return 1
+  fi
+  value=${line#*=}
+  value=${value%%#*}
+  value=$(printf '%s' "${value}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  if [[ -n "${value}" ]]; then
+    first=${value:0:1}
+    last=${value: -1}
+    value_length=${#value}
+    if [[ "${first}" == '"' && "${last}" == '"' && ${value_length} -ge 2 ]]; then
+      value=${value:1:value_length-2}
+    elif [[ "${first}" == "'" && "${last}" == "'" && ${value_length} -ge 2 ]]; then
+      value=${value:1:value_length-2}
+    fi
+  fi
+  printf '%s\n' "${value}"
+}
+
+if ! declare -F resolve_probe_script_path >/dev/null 2>&1; then
+  echo "probe-contract-gate: resolve_probe_script_path helper is unavailable" >&2
   exit 1
 fi
 

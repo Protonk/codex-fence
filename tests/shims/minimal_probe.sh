@@ -17,7 +17,7 @@ while [[ -z "${repo_root}" && "${repo_root_candidate}" != "/" ]]; do
   repo_root_candidate=$(cd "${repo_root_candidate}/.." >/dev/null 2>&1 && pwd)
 done
 if [[ -z "${repo_root}" ]]; then
-  echo "probe_fixture: unable to locate repo root" >&2
+  echo "minimal_probe: unable to locate repo root" >&2
   exit 1
 fi
 emit_record_bin="${repo_root}/bin/emit-record"

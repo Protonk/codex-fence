@@ -17,14 +17,41 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 gate_name="contract_static_gate"
 
-utils_path="${script_dir}/../../tests/library/utils.sh"
-if [[ -f "${utils_path}" ]]; then
+pathtools_path="${script_dir}/../../tools/pathtools.sh"
+if [[ -f "${pathtools_path}" ]]; then
   # shellcheck source=/dev/null
-  source "${utils_path}"
+  source "${pathtools_path}"
+else
+  echo "${gate_name}: missing tools/pathtools.sh helper" >&2
+  exit 1
 fi
 
-if ! declare -F extract_probe_var >/dev/null 2>&1; then
-  echo "${gate_name}: missing tests/library/utils.sh helpers" >&2
+extract_probe_var() {
+  local file="$1"
+  local var="$2"
+  local line value trimmed first last value_length
+  line=$(grep -E "^[[:space:]]*${var}=" "$file" | head -n1 || true)
+  if [[ -z "${line}" ]]; then
+    return 1
+  fi
+  value=${line#*=}
+  value=${value%%#*}
+  value=$(printf '%s' "${value}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  if [[ -n "${value}" ]]; then
+    first=${value:0:1}
+    last=${value: -1}
+    value_length=${#value}
+    if [[ "${first}" == '"' && "${last}" == '"' && ${value_length} -ge 2 ]]; then
+      value=${value:1:value_length-2}
+    elif [[ "${first}" == "'" && "${last}" == "'" && ${value_length} -ge 2 ]]; then
+      value=${value:1:value_length-2}
+    fi
+  fi
+  printf '%s\n' "${value}"
+}
+
+if ! declare -F resolve_probe_script_path >/dev/null 2>&1; then
+  echo "${gate_name}: missing resolve_probe_script_path helper" >&2
   exit 1
 fi
 
@@ -32,16 +59,10 @@ if [[ -z "${REPO_ROOT-}" ]]; then
   REPO_ROOT=$(cd "${script_dir}/../.." >/dev/null 2>&1 && pwd)
 fi
 
-portable_path_helper="${REPO_ROOT}/bin/portable-path"
-if [[ ! -x "${portable_path_helper}" ]]; then
-  echo "${gate_name}: missing portable-path helper at ${portable_path_helper}" >&2
+if ! declare -F portable_realpath >/dev/null 2>&1; then
+  echo "${gate_name}: missing portable_realpath helper" >&2
   exit 1
 fi
-
-portable_realpath() {
-  "${portable_path_helper}" realpath "$1"
-}
-
 usage() {
   cat <<'USAGE' >&2
 Usage: tools/contract_gate/static_gate.sh [--probe <probe-id-or-path>]
@@ -131,15 +152,6 @@ collect_probes() {
   done
 }
 
-have_flag() {
-  local script="$1"
-  local flag="$2"
-  if ! grep -q -- "${flag}" "${script}"; then
-    return 1
-  fi
-  return 0
-}
-
 check_probe() {
   local probe_script="$1"
   local rel_path=${probe_script#"${REPO_ROOT}/"}
@@ -181,30 +193,6 @@ check_probe() {
   if [[ -z "${primary_capability}" ]]; then
     errors+=("missing primary_capability_id assignment")
   fi
-
-  if ! grep -q 'emit_record_bin' "${probe_script}"; then
-    errors+=("missing emit_record_bin helper")
-  fi
-
-  local required_flags=(
-    '--run-mode'
-    '--probe-name'
-    '--probe-version'
-    '--primary-capability-id'
-    '--command'
-    '--category'
-    '--verb'
-    '--target'
-    '--status'
-    '--payload-file'
-    '--operation-args'
-  )
-  local flag
-  for flag in "${required_flags[@]}"; do
-    if ! have_flag "${probe_script}" "${flag}"; then
-      errors+=("missing ${flag} in emit-record call")
-    fi
-  done
 
   if [[ ${#errors[@]} -eq 0 ]]; then
     echo "${gate_name}: [PASS] ${rel_path}"

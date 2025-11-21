@@ -11,7 +11,7 @@ public boundary-object schema. The directory is split into four layers:
 | Layer | Entry point | Purpose |
 | --- | --- | --- |
 | Audits | `tests/audits/` | Agent instructions for conducting holistics and probe audits. |
-| Library | `tests/library/` | Shared Bash helpers + fixtures depended on by every suite. |
+| Shims | `tests/shims/` | Shared Bash helpers + fixtures depended on by every suite. |
 | Fast tier | `tools/contract_gate/` | Static probe contract (syntax + structural checks) for one probe—the tight authoring loop. |
 | Second tier | `tests/second_tier.rs` | Global checks that validate documentation, schema, and harness plumbing (run via `cargo test --test second_tier`). |
 
@@ -34,16 +34,11 @@ expectations even though they run through Cargo.
 
 ## Library components
 
-- `tests/library/utils.sh` exposes `REPO_ROOT`, `extract_probe_var`, and
-  `resolve_probe_script_path`. Source it from any new suite instead of duplicating
-  path logic. It shells out to `bin/portable-path realpath` so probe paths are
-  canonicalized before prefix checks—reuse that helper whenever you need to
-  reason about files under `probes/` or the workspace.
 - Schema validation now lives entirely in the Rust guard rails—run
   `cargo test --test second_tier boundary_object_schema` to lint the emitted
   boundary object against `schema/boundary_object.json` with the `jsonschema`
   crate.
-- `tests/library/fixtures/probe_fixture.sh` is a self-contained probe used by the
+- `tests/shims/minimal_probe.sh` is a self-contained probe used by the
   smoke suites. It writes to a temporary workspace and pipes a deterministic
   record into `bin/emit-record`. Prefer copying this file when you need a dummy
   probe rather than inventing ad‑hoc scripts.
@@ -61,9 +56,8 @@ tests. Target a specific scenario with `cargo test --test second_tier <name>`.
 | `workspace_root_fallback` | Executes the fixture probe with `FENCE_WORKSPACE_ROOT` cleared to confirm `bin/emit-record` falls back to `git rev-parse`/`pwd`. | Protects the documented workspace root fallback contract. |
 | `probe_resolution_guards` | Attempts to run `bin/fence-run` against paths/symlinks outside `probes/` and expects hard failures. | Use as a template for future negative guard-rail tests. |
 
-Add any heavier “whole repo” validation here. Follow the same structure: source
-`tests/library/utils.sh`, short-circuit on missing prerequisites, and print
-`name: PASS/FAIL` summaries.
+Add any heavier “whole repo” validation here. Follow the same structure: short-
+circuit on missing prerequisites, and print `name: PASS/FAIL` summaries.
 
 ## Adding or modifying tests
 
@@ -72,7 +66,7 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
 - **New probe-level checks:** Extend `tools/contract_gate/static_gate.sh`
   when adding additional structural or syntax rules so the single-probe
   workflow stays fast.
-- **New fixtures:** Place them under `tests/library/fixtures/` so multiple suites
+- **New fixtures:** Place them under `tests/shims/` so multiple suites
   can share them, and document any special behavior.
 - **New suites:** Add more Rust tests to `tests/second_tier.rs`. Keep them
   hermetic, reuse the fixture helpers, and gate probe directory mutations with

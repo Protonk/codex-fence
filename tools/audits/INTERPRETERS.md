@@ -1,4 +1,4 @@
-# tests/audits/AGENTS.md
+# tests/audits/INTERPRETERS.md
 
 This file contains a prompt for an agent engaged in a code audit of the repository. Use it if you are directed to undertake an audit of the project.
 

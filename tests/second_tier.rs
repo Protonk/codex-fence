@@ -415,7 +415,7 @@ struct FixtureProbe {
 
 impl FixtureProbe {
     fn install(repo_root: &Path, name: &str) -> Result<Self> {
-        let source = repo_root.join("tests/library/fixtures/probe_fixture.sh");
+        let source = repo_root.join("tests/shims/minimal_probe.sh");
         let dest = repo_root.join("probes").join(format!("{name}.sh"));
         if dest.exists() {
             bail!("fixture already exists at {}", dest.display());
