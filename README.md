@@ -200,7 +200,7 @@ mode, Codex version, or host OS.
 
 Probe development centers on a tight loop plus repo-wide guard rails:
 
-- `tests/probe_contract/static_probe_contract.sh --probe <id>` (or
+- `tools/contract_gate/static_gate.sh --probe <id>` (or
   `make probe PROBE=<id>`) runs the interpreted static contract for one probe.
 - `codex-fence --test` runs the same static contract across every probe.
 - `cargo test --test second_tier` executes the Rust guard rails

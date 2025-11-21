@@ -65,7 +65,7 @@ update these helpers together.
   - Reject invalid input with clear error messages; don’t panic.
 
 ### `fence-test`
-- **Purpose:** Execute `tests/probe_contract/static_probe_contract.sh` for the
+- **Purpose:** Execute `tools/contract_gate/static_gate.sh` for the
   full probe set while enforcing repo root detection and a predictable
   environment.
 - **Expectations:**

@@ -15,14 +15,16 @@
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
+gate_name="contract_static_gate"
 
-if [[ -f "${script_dir}/../library/utils.sh" ]]; then
+utils_path="${script_dir}/../../tests/library/utils.sh"
+if [[ -f "${utils_path}" ]]; then
   # shellcheck source=/dev/null
-  source "${script_dir}/../library/utils.sh"
+  source "${utils_path}"
 fi
 
 if ! declare -F extract_probe_var >/dev/null 2>&1; then
-  echo "static_probe_contract: missing tests/library/utils.sh helpers" >&2
+  echo "${gate_name}: missing tests/library/utils.sh helpers" >&2
   exit 1
 fi
 
@@ -32,7 +34,7 @@ fi
 
 portable_path_helper="${REPO_ROOT}/bin/portable-path"
 if [[ ! -x "${portable_path_helper}" ]]; then
-  echo "static_probe_contract: missing portable-path helper at ${portable_path_helper}" >&2
+  echo "${gate_name}: missing portable-path helper at ${portable_path_helper}" >&2
   exit 1
 fi
 
@@ -42,7 +44,7 @@ portable_realpath() {
 
 usage() {
   cat <<'USAGE' >&2
-Usage: tests/probe_contract/static_probe_contract.sh [--probe <probe-id-or-path>]
+Usage: tools/contract_gate/static_gate.sh [--probe <probe-id-or-path>]
 
 Runs syntax + structural checks against one probe (with --probe) or against
 every probes/*.sh script when no arguments are supplied.
@@ -59,7 +61,7 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       if [[ -n "${target_probe}" ]]; then
-        echo "static_probe_contract: only one --probe value is supported" >&2
+        echo "${gate_name}: only one --probe value is supported" >&2
         exit 1
       fi
       target_probe="$2"
@@ -70,7 +72,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "static_probe_contract: unknown argument '$1'" >&2
+      echo "${gate_name}: unknown argument '$1'" >&2
       usage
       exit 1
       ;;
@@ -99,7 +101,7 @@ if command -v bash >/dev/null 2>&1; then
   bash_bin="$(command -v bash)"
 fi
 if [[ -z "${bash_bin}" ]]; then
-  echo "static_probe_contract: unable to locate bash interpreter for syntax checks" >&2
+  echo "${gate_name}: unable to locate bash interpreter for syntax checks" >&2
   exit 1
 fi
 
@@ -108,11 +110,11 @@ collect_probes() {
     local resolved
     resolved=$(resolve_probe "${target_probe}")
     if [[ -z "${resolved}" || ! -f "${resolved}" ]]; then
-      echo "static_probe_contract: unable to resolve probe '${target_probe}'" >&2
+      echo "${gate_name}: unable to resolve probe '${target_probe}'" >&2
       exit 1
     fi
     if [[ "${resolved}" != "${REPO_ROOT}/probes/"* ]]; then
-      echo "static_probe_contract: '${resolved}' is outside probes/" >&2
+      echo "${gate_name}: '${resolved}' is outside probes/" >&2
       exit 1
     fi
     printf '%s\n' "${resolved}"
@@ -120,7 +122,7 @@ collect_probes() {
   fi
 
   if [[ ! -d "${REPO_ROOT}/probes" ]]; then
-    echo "static_probe_contract: probes/ directory not found" >&2
+    echo "${gate_name}: probes/ directory not found" >&2
     exit 1
   fi
 
@@ -205,11 +207,11 @@ check_probe() {
   done
 
   if [[ ${#errors[@]} -eq 0 ]]; then
-    echo "static_probe_contract: [PASS] ${rel_path}"
+    echo "${gate_name}: [PASS] ${rel_path}"
     return 0
   fi
 
-  echo "static_probe_contract: [FAIL] ${rel_path}" >&2
+  echo "${gate_name}: [FAIL] ${rel_path}" >&2
   local err
   for err in "${errors[@]}"; do
     echo "  - ${err}" >&2
@@ -223,7 +225,7 @@ while IFS= read -r script; do
 done < <(collect_probes)
 
 if [[ ${#probe_list[@]} -eq 0 ]]; then
-  echo "static_probe_contract: no probes found" >&2
+  echo "${gate_name}: no probes found" >&2
   exit 1
 fi
 
@@ -235,14 +237,14 @@ for script in "${probe_list[@]}"; do
 done
 
 if [[ ${failures} -gt 0 ]]; then
-  echo "static_probe_contract: ${failures} probe(s) failed" >&2
+  echo "${gate_name}: ${failures} probe(s) failed" >&2
   exit 1
 fi
 
 if [[ -n "${target_probe}" ]]; then
-  echo "static_probe_contract: verified ${target_probe}" >&2
+  echo "${gate_name}: verified ${target_probe}" >&2
 else
-  echo "static_probe_contract: verified ${#probe_list[@]} probe(s)" >&2
+  echo "${gate_name}: verified ${#probe_list[@]} probe(s)" >&2
 fi
 
 exit 0

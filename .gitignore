@@ -7,3 +7,4 @@ out/
 /target
 bin/*
 !bin/.gitkeep
+!bin/probe-contract-gate

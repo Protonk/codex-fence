@@ -11,7 +11,7 @@ fn main() {
 
 fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
-    let script = repo_root.join("tests/probe_contract/static_probe_contract.sh");
+    let script = repo_root.join("tools/contract_gate/static_gate.sh");
     let status = Command::new(&script)
         .current_dir(&repo_root)
         .stdin(Stdio::inherit())

@@ -12,7 +12,7 @@ public boundary-object schema. The directory is split into four layers:
 | --- | --- | --- |
 | Audits | `tests/audits/` | Agent instructions for conducting holistics and probe audits. |
 | Library | `tests/library/` | Shared Bash helpers + fixtures depended on by every suite. |
-| Fast tier | `tests/probe_contract/` | Static probe contract (syntax + structural checks) for one probe—the tight authoring loop. |
+| Fast tier | `tools/contract_gate/` | Static probe contract (syntax + structural checks) for one probe—the tight authoring loop. |
 | Second tier | `tests/second_tier.rs` | Global checks that validate documentation, schema, and harness plumbing (run via `cargo test --test second_tier`). |
 
 The static probe contract must stay portable (`/bin/bash 3.2` on macOS), silent
@@ -22,7 +22,7 @@ expectations even though they run through Cargo.
 ## Quick start for agents
 
 1. **While editing a probe** run
-  `tests/probe_contract/static_probe_contract.sh --probe <id>` (or
+  `tools/contract_gate/static_gate.sh --probe <id>` (or
   `make probe PROBE=<id>`). This invokes the interpreted contract tester for the
   resolved probe path and surfaces syntax/structural issues immediately.
 2. **Before sending a change** run `codex-fence --test` to sweep the static
@@ -69,7 +69,7 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
 
 - **Guard-rail comments:** Every script now starts with a summary block—keep this
   habit so future agents know why a suite exists.
-- **New probe-level checks:** Extend `tests/probe_contract/static_probe_contract.sh`
+- **New probe-level checks:** Extend `tools/contract_gate/static_gate.sh`
   when adding additional structural or syntax rules so the single-probe
   workflow stays fast.
 - **New fixtures:** Place them under `tests/library/fixtures/` so multiple suites

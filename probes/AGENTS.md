@@ -14,7 +14,7 @@ As the Probe Author, you:
   coverage and how outcomes are classified.
 - Keep a tight edit/test loop. While iterating on a script, run the
   interpreted quick-fail contract tester,
-  `tests/probe_contract/static_probe_contract.sh --probe probes/<id>.sh`, to
+  `tools/contract_gate/static_gate.sh --probe probes/<id>.sh`, to
   validate syntax and structure in isolation.
 
 Keep each probe:

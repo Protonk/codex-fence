@@ -347,7 +347,7 @@ fn static_probe_contract_accepts_fixture() -> Result<()> {
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let mut cmd = Command::new(repo_root.join("tests/probe_contract/static_probe_contract.sh"));
+    let mut cmd = Command::new(repo_root.join("tools/contract_gate/static_gate.sh"));
     cmd.arg("--probe").arg(fixture.probe_id());
     let output = run_command(cmd)?;
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -390,7 +390,7 @@ primary_capability_id="cap_fs_read_workspace_tree"
         contents,
     )?;
 
-    let mut cmd = Command::new(repo_root.join("tests/probe_contract/static_probe_contract.sh"));
+    let mut cmd = Command::new(repo_root.join("tools/contract_gate/static_gate.sh"));
     cmd.arg("--probe").arg(broken.probe_id());
     let output = cmd
         .output()
