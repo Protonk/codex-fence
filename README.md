@@ -38,7 +38,8 @@ Everything in the repo exists to turn a capability into an auditable signal:
 
 1. **Catalog** – `schema/capabilities.json` enumerates what we care about (fs,
    network, process, etc.). `docs/capabilities.md` explains the structure while
-   `tools/capabilities_adapter.sh` keeps every consumer on the same view.
+   the Rust capability index keeps every consumer on the same view. The legacy
+   `tools/capabilities_adapter.sh` remains for shell-only automation.
 2. **Probe contract** – A probe under `probes/<probe_id>.sh` binds one
    capability (`primary_capability_id`) to an observable action. The author
    follows [probes/AGENTS.md](probes/AGENTS.md), sources helpers from `lib/`,
@@ -47,15 +48,16 @@ Everything in the repo exists to turn a capability into an auditable signal:
    calls the probe. Helpers in `lib/` give probes predictable utilities, while
    `bin/detect-stack` captures host metadata.
 4. **Record emission** – Probes call `bin/emit-record`, which validates CLI
-   arguments, pulls capability metadata through the adapter, stamps stack info,
-   and serializes a cfbo-v1 document per [docs/boundary_object.md](docs/boundary_object.md).
+   arguments, resolves capability metadata through the Rust index, stamps stack
+   info via `detect-stack`, and serializes a cfbo-v1 document per
+   [docs/boundary_object.md](docs/boundary_object.md).
 5. **Signals** – Each run lands in `out/<probe>.<mode>.json`. Comparing those
    boundary objects across modes, commits, or hosts shows how the fence behaves
    in practice.
 
-This pipeline deliberately favors redundancy: machine artifacts (schema,
-adapters, cfbo records) are authoritative while the `AGENTS.md` files and docs
-explain how to work with them.
+This pipeline deliberately favors redundancy: machine artifacts (schema, the
+Rust capability index, cfbo records) are authoritative while the `AGENTS.md`
+files and docs explain how to work with them.
 
 ### Probe anatomy
 
@@ -156,6 +158,10 @@ Use `codex-fence` for the common workflows:
   human-readable summary of what succeeded or failed.
 - `codex-fence --test` runs the static probe contract across every
   `probes/*.sh` script.
+- `codex-fence --coverage-map [path]` emits the capability→probe coverage map
+  to stdout or to the provided path.
+- `codex-fence --validate-capabilities` checks that probes, fixtures, and
+  stored boundary objects only reference cataloged capability IDs.
 
 Pipeline example:
 
@@ -201,12 +207,13 @@ Probe development centers on a tight loop plus repo-wide guard rails:
   `make probe PROBE=<id>`) runs the interpreted static contract for one probe.
 - `codex-fence --test` runs the same static contract across every probe.
 - `cargo test --test second_tier` executes the Rust guard rails
-  (`capability_map_sync`, `boundary_object_schema`,
+  (`boundary_object_schema`,
   `harness_smoke_probe_fixture`, `baseline_no_codex_smoke`, etc.).
 - `make validate-capabilities` confirms that probes, fixtures, and stored
-  boundary objects only reference cataloged capability IDs.
+  boundary objects only reference cataloged capability IDs (via
+  `codex-fence --validate-capabilities`).
 
-The guard-rail scripts invoked by those targets live under `tools/`—read
-`tools/AGENTS.md` before editing them. When in doubt about a workflow or
-directory contract, follow the layered guidance described in the various
-`*/AGENTS.md` files.
+Capability guard rails now live in Rust (`codex-fence` + tests) with
+`tools/capabilities_adapter.sh` kept for legacy automation. When in doubt
+about a workflow or directory contract, follow the layered guidance described
+in the various `*/AGENTS.md` files.

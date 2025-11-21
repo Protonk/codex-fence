@@ -1,10 +1,14 @@
 #![cfg(unix)]
 
 use anyhow::{Context, Result, anyhow, bail};
-use codex_fence::{BoundaryObject, find_repo_root};
+use codex_fence::{
+    BoundaryObject, CapabilityIndex, CoverageEntry, ProbeMetadata, build_probe_coverage_map,
+    collect_probe_scripts, filter_coverage_probes, find_repo_root, validate_boundary_objects,
+    validate_probe_capabilities,
+};
 use jsonschema::JSONSchema;
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -14,121 +18,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use tempfile::{NamedTempFile, TempDir};
-
-const TEMP_PROBE_NAMES: &[&str] = &["tests_fixture_probe", "tests_static_contract_broken"];
-
-#[test]
-fn capability_map_sync() -> Result<()> {
-    let repo_root = repo_root();
-    let capability_ids = load_capability_ids(&repo_root)?;
-    anyhow::ensure!(
-        !capability_ids.is_empty(),
-        "capabilities_adapter returned no ids"
-    );
-
-    let coverage = load_coverage_map(&repo_root)?;
-    let probes = load_probe_metadata(&repo_root.join("probes"))?;
-
-    let mut errors = Vec::new();
-
-    for (cap_id, entry) in &coverage {
-        if !capability_ids.contains(cap_id) {
-            errors.push(format!("coverage references unknown capability '{cap_id}'"));
-        }
-        if entry.raw_has_probe.is_none() {
-            errors.push(format!(
-                "coverage entry for '{cap_id}' missing has_probe flag"
-            ));
-        }
-    }
-
-    for cap in &capability_ids {
-        if !coverage.contains_key(cap) {
-            errors.push(format!(
-                "docs/data/probe_cap_coverage_map.json missing entry for '{cap}'"
-            ));
-        }
-    }
-
-    let mut capability_to_probes: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut probe_to_cap: BTreeMap<String, String> = BTreeMap::new();
-
-    for probe in &probes {
-        let rel = relative_to_repo(&probe.script, &repo_root);
-        let Some(name) = &probe.name else {
-            errors.push(format!("{rel} is missing probe_name"));
-            continue;
-        };
-        let Some(primary) = &probe.primary_capability else {
-            errors.push(format!("{rel} is missing primary_capability_id"));
-            continue;
-        };
-        if !capability_ids.contains(primary) {
-            errors.push(format!("{rel} references unknown capability '{primary}'"));
-            continue;
-        }
-        if TEMP_PROBE_NAMES
-            .iter()
-            .any(|ignored| *ignored == name.as_str())
-        {
-            continue;
-        }
-
-        capability_to_probes
-            .entry(primary.clone())
-            .or_default()
-            .push(name.clone());
-        probe_to_cap.insert(name.clone(), primary.clone());
-    }
-
-    for probes in capability_to_probes.values_mut() {
-        probes.sort();
-    }
-
-    for (cap_id, entry) in &coverage {
-        let actual = capability_to_probes
-            .get(cap_id)
-            .cloned()
-            .unwrap_or_default();
-        if entry.has_probe && actual.is_empty() {
-            errors.push(format!(
-                "{cap_id} marked has_probe=true but no probes declare it"
-            ))
-        }
-        if !entry.has_probe && !actual.is_empty() {
-            errors.push(format!(
-                "{cap_id} marked has_probe=false but probes {:?} target it",
-                actual
-            ))
-        }
-
-        for listed in &entry.probe_ids {
-            match probe_to_cap.get(listed) {
-                None => errors.push(format!("{cap_id} lists unknown probe '{listed}'")),
-                Some(actual_cap) if actual_cap != cap_id => errors.push(format!(
-                    "{cap_id} lists probe '{listed}' but script targets '{actual_cap}'"
-                )),
-                _ => {}
-            }
-        }
-
-        if !actual.is_empty() {
-            for probe_name in &actual {
-                if entry.probe_ids.is_empty() || !entry.probe_ids.contains(probe_name) {
-                    errors.push(format!(
-                        "{cap_id} missing probe '{probe_name}' in coverage list"
-                    ));
-                }
-            }
-        }
-    }
-
-    if !errors.is_empty() {
-        bail!("capability map drift:\n{}", errors.join("\n"));
-    }
-
-    Ok(())
-}
 
 #[test]
 fn boundary_object_schema() -> Result<()> {
@@ -524,18 +413,6 @@ primary_capability_id="cap_fs_read_workspace_tree"
     Ok(())
 }
 
-struct CoverageEntry {
-    has_probe: bool,
-    raw_has_probe: Option<bool>,
-    probe_ids: Vec<String>,
-}
-
-struct ProbeMetadata {
-    script: PathBuf,
-    name: Option<String>,
-    primary_capability: Option<String>,
-}
-
 struct FixtureProbe {
     path: PathBuf,
     name: String,
@@ -611,16 +488,6 @@ fn repo_root() -> PathBuf {
     find_repo_root().expect("tests require repository root")
 }
 
-fn load_capability_ids(repo_root: &Path) -> Result<BTreeSet<String>> {
-    let adapter = repo_root.join("tools/capabilities_adapter.sh");
-    let output = run_command(Command::new(&adapter))?;
-    let value: Value = serde_json::from_slice(&output.stdout)?;
-    let obj = value
-        .as_object()
-        .ok_or_else(|| anyhow!("capabilities_adapter output must be an object"))?;
-    Ok(obj.keys().cloned().collect())
-}
-
 fn load_coverage_map(repo_root: &Path) -> Result<BTreeMap<String, CoverageEntry>> {
     let path = repo_root.join("docs/data/probe_cap_coverage_map.json");
     let value: Value = serde_json::from_reader(File::open(&path)?)?;
@@ -633,7 +500,6 @@ fn load_coverage_map(repo_root: &Path) -> Result<BTreeMap<String, CoverageEntry>
             .get("has_probe")
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let raw_has_probe = entry.get("has_probe").and_then(Value::as_bool);
         let probe_ids = entry
             .get("probe_ids")
             .and_then(Value::as_array)
@@ -647,7 +513,6 @@ fn load_coverage_map(repo_root: &Path) -> Result<BTreeMap<String, CoverageEntry>
             key.clone(),
             CoverageEntry {
                 has_probe,
-                raw_has_probe,
                 probe_ids,
             },
         );
@@ -655,75 +520,12 @@ fn load_coverage_map(repo_root: &Path) -> Result<BTreeMap<String, CoverageEntry>
     Ok(map)
 }
 
-fn load_probe_metadata(probes_dir: &Path) -> Result<Vec<ProbeMetadata>> {
-    fn collect(dir: &Path, acc: &mut Vec<PathBuf>) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                collect(&path, acc)?;
-            } else if path.extension().and_then(|ext| ext.to_str()) == Some("sh") {
-                acc.push(path);
-            }
-        }
-        Ok(())
-    }
-
-    let mut scripts = Vec::new();
-    collect(probes_dir, &mut scripts)?;
-    scripts.sort();
-
+fn load_probe_metadata(scripts: &[PathBuf]) -> Result<Vec<ProbeMetadata>> {
     let mut probes = Vec::new();
     for script in scripts {
-        let contents = fs::read_to_string(&script)?;
-        let name = parse_probe_assignment(&contents, "probe_name");
-        let primary = parse_probe_assignment(&contents, "primary_capability_id");
-        probes.push(ProbeMetadata {
-            script,
-            name,
-            primary_capability: primary,
-        });
+        probes.push(ProbeMetadata::from_script(script)?);
     }
     Ok(probes)
-}
-
-fn parse_probe_assignment(contents: &str, var_name: &str) -> Option<String> {
-    let prefix = var_name;
-    for line in contents.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with('#') {
-            continue;
-        }
-        let rest = match trimmed.strip_prefix(&prefix) {
-            Some(r) => r,
-            None => continue,
-        };
-        let rest = rest.trim_start();
-        if !rest.starts_with('=') {
-            continue;
-        }
-        let mut value = rest[1..].trim_start();
-        if value.is_empty() {
-            continue;
-        }
-        if value.starts_with('"') {
-            value = &value[1..];
-            if let Some(end) = value.find('"') {
-                return Some(value[..end].to_string());
-            }
-        } else if value.starts_with('\'') {
-            value = &value[1..];
-            if let Some(end) = value.find('\'') {
-                return Some(value[..end].to_string());
-            }
-        } else {
-            let token = value.split_whitespace().next().unwrap_or("").trim();
-            if !token.is_empty() {
-                return Some(token.to_string());
-            }
-        }
-    }
-    None
 }
 
 fn parse_boundary_object(bytes: &[u8]) -> Result<(BoundaryObject, Value)> {

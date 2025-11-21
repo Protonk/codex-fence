@@ -1,6 +1,6 @@
 # Probe Contract and Boundary Object (cfbo-v1)
 
-`codex-fence` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v1** is the current contract. It incorporates the current capability schema (via `tools/capabilities_adapter.sh`) so every record carries a snapshot of the capability metadata it referenced.
+`codex-fence` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v1** is the current contract. It incorporates the current capability schema (via the Rust capability index backed by `schema/capabilities.json`) so every record carries a snapshot of the capability metadata it referenced.
 
 Each boundary object captures *one* probe execution in one run mode. Probes are tiny scripts stored under `probes/<probe_id>.sh` (filenames match the capability catalog’s probe ids) that:
 
@@ -28,14 +28,14 @@ The machine-readable definition lives in `schema/boundary_object.json` and is en
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` resolved via the adapter. It is a string with no whitespace such as `macOS_codex_v1`; `null` is reserved for situations where the schema cannot be determined. |
+| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` resolved via the capability index. It is a string with no whitespace such as `macOS_codex_v1`; `null` is reserved for situations where the schema cannot be determined. |
 | `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command). This harness intentionally omits timestamps so records stay stateless. |
 | `operation` | yes | Description of the sandbox-facing operation being attempted. |
 | `result` | yes | Normalized observed outcome plus error metadata. |
 | `payload` | yes | Small probe-specific diagnostics and structured raw data. |
-| `capability_context` | yes | Snapshot of the primary/secondary capability entries as seen through the adapter. |
+| `capability_context` | yes | Snapshot of the primary/secondary capability entries as seen through the capability index. |
 
 ### `stack`
 
@@ -58,10 +58,10 @@ Probe identity stays explicit and tied to the capability catalog.
 | --- | --- | --- |
 | `id` | yes | Stable slug (usually the probe filename) such as `fs_outside_workspace`. |
 | `version` | yes | Probe-local semantic/string version; bump when behavior changes. |
-| `primary_capability_id` | yes | Capability tested by this probe. Must match the adapter output. |
+| `primary_capability_id` | yes | Capability tested by this probe. Must match the capability catalog. |
 | `secondary_capability_ids` | yes | Zero or more supporting capability ids (unique, may be empty). |
 
-`bin/emit-record` validates capability IDs by piping `schema/capabilities.json` through `tools/capabilities_adapter.sh`. Add or update IDs there first.
+`bin/emit-record` validates capability IDs by loading `schema/capabilities.json` directly (the legacy adapter remains for automation). Add or update IDs in the catalog first.
 
 ### `run`
 
@@ -122,7 +122,7 @@ Every record includes the capability snapshot(s) that were resolved when the pro
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `primary` | yes | Object with `id`, `category`, `layer` from the adapter. |
+| `primary` | yes | Object with `id`, `category`, `layer` from the capability index. |
 | `secondary` | no | Array of the same structure (may be empty). |
 
 ## Example

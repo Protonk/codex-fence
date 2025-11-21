@@ -1,11 +1,9 @@
 use anyhow::{anyhow, bail, Context, Result};
 use codex_fence::{
-    find_repo_root, load_catalog_from_path, resolve_helper_binary, CatalogKey, CapabilityCategory,
-    CapabilityId, CapabilityLayer, CapabilitySnapshot,
+    find_repo_root, resolve_helper_binary, CapabilityId, CapabilityIndex, CapabilitySnapshot,
 };
-use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,31 +22,29 @@ fn run() -> Result<()> {
 
     let detect_stack = resolve_helper_binary(&repo_root, "detect-stack")?;
 
-    let capabilities_adapter = repo_root.join("tools/capabilities_adapter.sh");
-    if !is_executable(&capabilities_adapter) {
+    let capability_catalog_path = repo_root.join("schema/capabilities.json");
+    let capability_index = CapabilityIndex::load(&capability_catalog_path).with_context(|| {
+        format!(
+            "loading capability catalog from {}",
+            capability_catalog_path.display()
+        )
+    })?;
+    if capability_index.ids().next().is_none() {
         bail!(
-            "Capability adapter not found or not executable at {}",
-            capabilities_adapter.display()
-        );
-    }
-
-    let capabilities = load_capabilities(&capabilities_adapter)?;
-    if capabilities.is_empty() {
-        bail!(
-            "No capability IDs returned by {}",
-            capabilities_adapter.display()
+            "No capability IDs found in {}",
+            capability_catalog_path.display()
         );
     }
 
     validate_capability_id(
-        &capabilities,
+        &capability_index,
         &args.primary_capability_id,
         "primary capability id",
     )?;
     let secondary_capability_ids =
-        normalize_secondary_ids(&capabilities, &args.secondary_capability_ids)?;
+        normalize_secondary_ids(&capability_index, &args.secondary_capability_ids)?;
 
-    let capabilities_schema_version = read_capabilities_schema_version(&repo_root)?;
+    let capabilities_schema_version = capability_index.key().clone();
 
     let payload = match &args.payload_file {
         Some(path) => {
@@ -76,10 +72,14 @@ fn run() -> Result<()> {
         "error_detail": args.error_detail,
     });
 
-    let primary_capability_snapshot =
-        capability_snapshot(&capabilities, &args.primary_capability_id)?;
-    let secondary_capability_snapshots =
-        snapshots_for_secondary(&capabilities, &secondary_capability_ids)?;
+    let primary_capability = capability_index
+        .capability(&args.primary_capability_id)
+        .ok_or_else(|| anyhow!("Unable to resolve capability metadata for {}", args.primary_capability_id.0))?;
+    let secondary_capabilities =
+        resolve_secondary_capabilities(&capability_index, &secondary_capability_ids)?;
+    let primary_capability_snapshot = primary_capability.snapshot();
+    let secondary_capability_snapshots: Vec<CapabilitySnapshot> =
+        secondary_capabilities.iter().map(|cap| cap.snapshot()).collect();
 
     let record = json!({
         "schema_version": "cfbo-v1",
@@ -295,44 +295,8 @@ fn validate_status(status: &str) -> Result<()> {
     }
 }
 
-fn is_executable(path: &Path) -> bool {
-    if !path.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(meta) = fs::metadata(path) {
-            return meta.permissions().mode() & 0o111 != 0;
-        }
-        return false;
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
-
-fn load_capabilities(path: &Path) -> Result<BTreeMap<CapabilityId, CapabilityRecord>> {
-    let output = Command::new(path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .with_context(|| format!("Failed to execute {}", path.display()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Capability adapter failed: {stderr}");
-    }
-
-    let map: BTreeMap<CapabilityId, CapabilityRecord> = serde_json::from_slice(&output.stdout)
-        .context("Capability adapter emitted invalid JSON")?;
-
-    Ok(map)
-}
-
 fn normalize_secondary_ids(
-    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    capabilities: &CapabilityIndex,
     raw: &[CapabilityId],
 ) -> Result<Vec<CapabilityId>> {
     let mut acc: BTreeSet<CapabilityId> = BTreeSet::new();
@@ -349,37 +313,17 @@ fn normalize_secondary_ids(
 }
 
 fn validate_capability_id(
-    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+    capabilities: &CapabilityIndex,
     value: &CapabilityId,
     label: &str,
 ) -> Result<()> {
-    if capabilities.contains_key(value) {
+    if capabilities.capability(value).is_some() {
         return Ok(());
     }
     bail!(
         "Unknown {label}: {}. Expected one of the IDs in schema/capabilities.json.",
         value.0
     );
-}
-
-fn read_capabilities_schema_version(repo_root: &Path) -> Result<CatalogKey> {
-    let path = repo_root.join("schema/capabilities.json");
-    let catalog = load_catalog_from_path(&path)
-        .with_context(|| format!("Unable to load capability catalog from {}", path.display()))?;
-    let value = catalog.key.0.clone();
-    if !is_valid_schema_version(&value) {
-        bail!(
-            "Invalid capabilities schema_version: {value}. Expected an alphanumeric string without spaces."
-        );
-    }
-    Ok(catalog.key)
-}
-
-fn is_valid_schema_version(value: &str) -> bool {
-    value
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
-        && !value.is_empty()
 }
 
 fn read_json_file(path: &Path) -> Result<Value> {
@@ -412,46 +356,18 @@ fn default_payload() -> Value {
     })
 }
 
-#[derive(Deserialize, Clone)]
-struct CapabilityRecord {
-    id: CapabilityId,
-    category: Option<CapabilityCategory>,
-    layer: Option<CapabilityLayer>,
-}
-
-fn capability_snapshot(
-    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
-    cap_id: &CapabilityId,
-) -> Result<CapabilitySnapshot> {
-    let Some(cap) = capabilities.get(cap_id) else {
-        bail!("Unable to resolve capability metadata for {}", cap_id.0);
-    };
-
-    let category = cap
-        .category
-        .clone()
-        .ok_or_else(|| anyhow!("Capability {} missing category", cap_id.0))?;
-    let layer = cap
-        .layer
-        .clone()
-        .ok_or_else(|| anyhow!("Capability {} missing layer", cap_id.0))?;
-
-    Ok(CapabilitySnapshot {
-        id: cap.id.clone(),
-        category,
-        layer,
-    })
-}
-
-fn snapshots_for_secondary(
-    capabilities: &BTreeMap<CapabilityId, CapabilityRecord>,
+fn resolve_secondary_capabilities<'a>(
+    capabilities: &'a CapabilityIndex,
     ids: &[CapabilityId],
-) -> Result<Vec<CapabilitySnapshot>> {
-    let mut snapshots = Vec::new();
+) -> Result<Vec<&'a codex_fence::Capability>> {
+    let mut caps = Vec::new();
     for id in ids {
-        snapshots.push(capability_snapshot(capabilities, id)?);
+        let Some(cap) = capabilities.capability(id) else {
+            bail!("Unable to resolve capability metadata for {}", id.0);
+        };
+        caps.push(cap);
     }
-    Ok(snapshots)
+    Ok(caps)
 }
 
 fn resolve_workspace_root() -> Result<Option<String>> {
@@ -506,35 +422,7 @@ fn not_empty(value: &String) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn sample_caps() -> BTreeMap<CapabilityId, CapabilityRecord> {
-        let mut map = BTreeMap::new();
-        map.insert(
-            CapabilityId("cap_a".to_string()),
-            CapabilityRecord {
-                id: CapabilityId("cap_a".to_string()),
-                category: Some(CapabilityCategory::Other("cat".to_string())),
-                layer: Some(CapabilityLayer::Other("layer".to_string())),
-            },
-        );
-        map.insert(
-            CapabilityId("cap_b".to_string()),
-            CapabilityRecord {
-                id: CapabilityId("cap_b".to_string()),
-                category: None,
-                layer: None,
-            },
-        );
-        map
-    }
-
-    #[test]
-    fn schema_version_validation() {
-        assert!(is_valid_schema_version("macOS_codex_v1"));
-        assert!(is_valid_schema_version("abc-1.2"));
-        assert!(!is_valid_schema_version(""));
-        assert!(!is_valid_schema_version("invalid value"));
-    }
+    use tempfile::NamedTempFile;
 
     #[test]
     fn validate_status_allows_known_values() {
@@ -546,7 +434,7 @@ mod tests {
 
     #[test]
     fn normalize_secondary_deduplicates_and_trims() {
-        let caps = sample_caps();
+        let caps = sample_index(&[("cap_a", "filesystem", "os_sandbox"), ("cap_b", "process", "agent_runtime")]);
         let input = vec![
             CapabilityId(" cap_a ".to_string()),
             CapabilityId("cap_b".to_string()),
@@ -565,11 +453,62 @@ mod tests {
 
     #[test]
     fn normalize_secondary_rejects_unknown() {
-        let caps = sample_caps();
+        let caps = sample_index(&[("cap_a", "filesystem", "os_sandbox")]);
         let input = vec![
             CapabilityId("cap_a".to_string()),
             CapabilityId("cap_missing".to_string()),
         ];
         assert!(normalize_secondary_ids(&caps, &input).is_err());
+    }
+
+    #[test]
+    fn capability_index_enforces_schema_version() {
+        let mut file = NamedTempFile::new().unwrap();
+        serde_json::to_writer(
+            &mut file,
+            &json!({
+                "schema_version": "unexpected",
+                "scope": {
+                    "description": "test",
+                    "policy_layers": [],
+                    "categories": {}
+                },
+                "docs": {},
+                "capabilities": []
+            }),
+        )
+        .unwrap();
+        assert!(CapabilityIndex::load(file.path()).is_err());
+    }
+
+    fn sample_index(entries: &[(&str, &str, &str)]) -> CapabilityIndex {
+        let mut file = NamedTempFile::new().unwrap();
+        let capabilities: Vec<Value> = entries
+            .iter()
+            .map(|(id, category, layer)| {
+                json!({
+                    "id": id,
+                    "category": category,
+                    "layer": layer,
+                    "description": format!("cap {id}"),
+                    "operations": {"allow": [], "deny": []}
+                })
+            })
+            .collect();
+        serde_json::to_writer(
+            &mut file,
+            &json!({
+                "schema_version": "macOS_codex_v1",
+                "scope": {
+                    "description": "test",
+                    "policy_layers": [],
+                    "categories": {}
+                },
+                "docs": {},
+                "capabilities": capabilities
+            }),
+        )
+        .unwrap();
+        CapabilityIndex::load(file.path()).expect("index loads")
     }
 }

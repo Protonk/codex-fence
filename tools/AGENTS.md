@@ -1,22 +1,20 @@
 # Tools Playbook for Agents
 
-This directory hosts the guard-rail scripts that keep capability metadata in a
-known-good state. When in doubt, study `capabilities_adapter.sh` (source of truth) and
-`validate_capabilities.sh` (consumer/validator) to understand how the tooling is
-wired together.
+This directory hosts the remaining guard-rail helpers for capability metadata.
+`capabilities_adapter.sh` stays as a legacy entry point for automated agents,
+but capability validation and coverage generation now live in Rust (`codex-fence
+--validate-capabilities` / `--coverage-map`).
 
-`generate_probe_coverage_map.sh` inspects the live probes and emits a
-capability→probe coverage map (matching `docs/data/probe_cap_coverage_map.json`).
-Run it manually when you add probes or capabilities to refresh the coverage map
-before updating docs.
+Run the Rust helpers when you add probes or capabilities so the coverage map and
+capability checks stay in sync with the schema.
 
 Before changing or adding tooling:
 - Mirror the existing safety posture: every script sets `set -euo pipefail`,
   resolves `repo_root`, and fails fast if prerequisites are absent.
 - Reuse the adapters that already normalize data. For example,
-  `capabilities_adapter.sh` is the only supported way to read
-  `schema/capabilities.json`; parsing the file directly can lead to stale or
-  inconsistent semantics.
+  `capabilities_adapter.sh` is the supported way for shell scripts to read
+  `schema/capabilities.json`; Rust callers should reuse the capability index and
+  avoid parsing the file directly in ad-hoc ways.
 - Ship hermetic behaviors. Store helper jq/awk/sed snippets inline (as the
   adapter does) so contributors can audit the script without hunting external
   files.
@@ -25,4 +23,3 @@ Before changing or adding tooling:
 - Document your intent at the top of the script with a guard-rail summary so
   future agents understand the blast radius and know which invariants the tool
   defends.
-

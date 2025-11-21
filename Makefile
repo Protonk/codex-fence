@@ -90,7 +90,7 @@ probe:
 
 # Confirm capability metadata (schema, adapters, fixtures) remain in sync.
 validate-capabilities:
-	tools/validate_capabilities.sh
+	cargo run --bin codex-fence -- --validate-capabilities
 
 build-bin:
 	tools/sync_bin_helpers.sh

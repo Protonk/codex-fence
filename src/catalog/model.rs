@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CapabilityCatalog {
     #[serde(rename = "schema_version")]
     pub key: CatalogKey,
@@ -16,7 +16,7 @@ pub struct CapabilityCatalog {
     pub capabilities: Vec<Capability>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Scope {
     pub description: String,
     #[serde(default)]
@@ -28,13 +28,13 @@ pub struct Scope {
     pub limitations: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PolicyLayer {
     pub id: String,
     pub description: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DocRef {
     pub title: String,
     #[serde(default)]
@@ -43,7 +43,7 @@ pub struct DocRef {
     pub url_hint: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Capability {
     pub id: CapabilityId,
     pub category: CapabilityCategory,
@@ -60,7 +60,7 @@ pub struct Capability {
     pub sources: Vec<CapabilitySource>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Operations {
     #[serde(default)]
     pub allow: Vec<String>,
@@ -68,7 +68,7 @@ pub struct Operations {
     pub deny: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CapabilitySource {
     pub doc: String,
     #[serde(default)]

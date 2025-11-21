@@ -8,16 +8,17 @@ update these helpers together.
 ## CLI entry points
 
 ### `codex-fence`
-- **Purpose:** Front door for `--bang`, `--listen`, and `--test`. Delegates to
-  the specialized helpers while guaranteeing `CODEX_FENCE_ROOT` points at the
-  repo so binaries can find fixtures.
+- **Purpose:** Front door for `--bang`, `--listen`, `--test`, plus metadata
+  utilities (`--coverage-map`, `--validate-capabilities`). Delegates to the
+  specialized helpers while guaranteeing `CODEX_FENCE_ROOT` points at the repo
+  so binaries can find fixtures.
 - **Expectations:**
   - Keep the CLI contract stable; add switches only when docs/tests are updated.
   - Prefer the compiled binaries (`bin/` first, then `target/{release,debug}`)
     when resolving helpers, falling back to `$PATH` only when necessary.
   - Propagate exit codes verbatim so harness automation can detect failures.
-  - `--test` must run inside the repo so it can execute `cargo test` before
-    delegating to the harness; keep that ordering intact.
+  - `--test` and the metadata commands must run inside the repo so they can
+    resolve the catalog and fixtures; keep that ordering intact.
 
 ### `fence-run`
 - **Purpose:** Resolve probe paths, enforce the requested sandbox mode, and
@@ -36,8 +37,9 @@ update these helpers together.
   emit cfbo-v1 JSON.
 - **Expectations:**
   - Validate inputs aggressively and surface actionable errors.
-  - Shell out only to `tools/capabilities_adapter.sh` and `detect-stack`; all
-    other work should remain pure Rust for portability.
+  - Shell out only to `detect-stack`; all other work should remain pure Rust for
+    portability and rely on the in-repo capability catalog instead of the
+    legacy adapter.
   - Avoid printing to stdout except for the final JSON record.
 
 ### `detect-stack`

@@ -8,6 +8,9 @@ use std::{
 
 pub mod boundary;
 pub mod catalog;
+pub mod coverage;
+pub mod probe_metadata;
+pub mod metadata_validation;
 
 pub use boundary::{
     BoundaryObject, CapabilityContext, OperationInfo, Payload, ProbeInfo, ResultInfo, RunInfo,
@@ -15,8 +18,11 @@ pub use boundary::{
 };
 pub use catalog::{
     load_catalog_from_path, CatalogKey, CatalogRepository, Capability, CapabilityCatalog,
-    CapabilityCategory, CapabilityId, CapabilityLayer, CapabilitySnapshot,
+    CapabilityCategory, CapabilityId, CapabilityIndex, CapabilityLayer, CapabilitySnapshot,
 };
+pub use coverage::{build_probe_coverage_map, filter_coverage_probes, CoverageEntry};
+pub use metadata_validation::{validate_boundary_objects, validate_probe_capabilities};
+pub use probe_metadata::{collect_probe_scripts, ProbeMetadata};
 
 const ROOT_SENTINEL: &str = "bin/.gitkeep";
 const SYNCED_BIN_DIR: &str = "bin";

@@ -6,7 +6,7 @@ This document summarizes the structure of `capabilities.json` so that humans and
 
 Read this document to see how each field in `capabilities.json` is structured and interpreted, and how capability entries connect to probes and supporting references.  
 
-`capabilities.json` begins with the `schema_version`, currently **macOS_codex_v1**. The adapter enforces that this identifier is an alphanumeric string with no whitespace so downstream tools can hard-fail on drift.
+`capabilities.json` begins with the `schema_version`, currently **macOS_codex_v1**. The Rust capability index enforces that this identifier is an alphanumeric string with no whitespace so downstream tools can hard-fail on drift (the legacy adapter keeps the same guard for shell callers).
 
 ### Catalog keys and repositories
 

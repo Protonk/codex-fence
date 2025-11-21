@@ -21,8 +21,9 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
   capture that nuance in the payload.
 - **Capabilities:** Every probe declares exactly one
   `primary_capability_id` (with optional `secondary_capability_ids`). The ids
-  come from `schema/capabilities.json` and are validated at emit time via the
-  adapter in `tools/capabilities_adapter.sh`.
+  come from `schema/capabilities.json` and are validated at emit time through
+  the Rust capability index (the legacy adapter in `tools/capabilities_adapter.sh`
+  remains for automation).
 - **Helpers:** Shared utilities live under `lib/` and the compiled helpers in
   `bin/`. Source only what you need instead of re-implementing interpreter
   detection. Canonical and relative path lookups now route through the Rust
@@ -94,4 +95,5 @@ The fast authoring loop favors single-probe runs:
 - `cargo test --test second_tier` covers the Rust guard rails (capability map
   sync, schema validation, harness smoke tests, etc.).
 - `make validate-capabilities` checks that every probe, fixture, and stored
-  boundary object references real capability ids.
+  boundary object references real capability ids via
+  `codex-fence --validate-capabilities`.

@@ -27,11 +27,6 @@ valuable.
 
 ### Helpers and tooling
 
-- Probe helpers live under `lib/` (one function per script when you add new
-  Bash utilities). Path canonicalization now lives in the Rust helper
-  `bin/portable-path`, so prefer `portable-path realpath|relpath` instead of
-  introducing interpreter fallbacks.
-- Project-level scripts (lint, validation, adapters) live under `tools/`.
 - The fast probe contract entry point is
   `tests/probe_contract/static_probe_contract.sh`; extend it for new
   syntax/structural checks instead of duplicating logic elsewhere.
@@ -50,9 +45,7 @@ valuable.
   remain instant, and remember that `codex-fence --test` now runs this helper
   across every probe.
 - The Rust-based guard rails live in `tests/second_tier.rs` and run via
-  `cargo test --test second_tier` (`capability_map_sync`,
-  `boundary_object_schema`, `harness_smoke_probe_fixture`,
-  `baseline_no_codex_smoke`, etc.). When expanding coverage, keep these tests
+  `cargo test --test second_tier` (`boundary_object_schema`, `harness_smoke_probe_fixture`, `baseline_no_codex_smoke`, etc.). When expanding coverage, keep these tests
   hermetic and deterministic.
 - The directory layout, fixtures, and suite expectations are captured in
   [`tests/AGENTS.md`](tests/AGENTS.md). Update that guide whenever you add a new

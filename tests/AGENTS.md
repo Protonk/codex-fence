@@ -26,9 +26,7 @@ expectations even though they run through Cargo.
   `make probe PROBE=<id>`). This invokes the interpreted contract tester for the
   resolved probe path and surfaces syntax/structural issues immediately.
 2. **Before sending a change** run `codex-fence --test` to sweep the static
-  contract across every probe. Then execute the Rust integration tests with
-  `cargo test --test second_tier`. Re-run a focused guard rail with, for example,
-  `cargo test --test second_tier capability_map_sync` to iterate faster.
+  contract across every probe. 
 3. **Debugging**: The second-tier guard rails are standard Rust integration
   tests. Use `cargo test --test second_tier <name>` (for example
   `cargo test --test second_tier workspace_root_fallback`) to focus on one
@@ -57,7 +55,6 @@ tests. Target a specific scenario with `cargo test --test second_tier <name>`.
 
 | Test | Purpose | Notes |
 | --- | --- | --- |
-| `capability_map_sync` | Confirms docs/data/probe_cap_coverage_map.json, tools/capabilities_adapter.sh, and probe metadata all reference the same capability ids. | Update docs + adapter when adding capabilities before rerunning this check. |
 | `boundary_object_schema` | Runs `bin/emit-record` with a fixture payload and validates the resulting JSON plus the boundary object schema. | Extend the assertions and schema when the boundary_object contract grows. |
 | `harness_smoke_probe_fixture` | Runs the fixture probe via `bin/fence-run baseline` and checks the returned boundary object. | Keeps the baseline path honest; extend if fixtures gain new fields. |
 | `baseline_no_codex_smoke` | Temporarily hides the Codex CLI from `PATH` and asserts baseline runs still succeed while codex modes fail. | Make sure new smoke fixtures do not depend on `codex`. |
@@ -91,8 +88,9 @@ Add any heavier “whole repo” validation here. Follow the same structure: sou
   mismatched `probe_name`, etc.). Open the failing script directly and fix the
   reported condition.
 - **Capability coverage failures** mean either a document drift or a probe now
-  references an unknown capability. Update `docs/data/probe_cap_coverage_map.json` and
-  `tools/capabilities_adapter.sh` in the same commit.
+  references an unknown capability. Update `schema/capabilities.json` and
+  regenerate `docs/data/probe_cap_coverage_map.json` (via `codex-fence --coverage-map`)
+  in the same commit.
 - **Harness/baseline smoke failures** often indicate regressions in
   `bin/fence-run` or `bin/emit-record`. Run the failing script with `bash -x` to
   inspect the plumbing.
