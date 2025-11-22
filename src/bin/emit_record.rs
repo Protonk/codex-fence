@@ -694,7 +694,7 @@ fn resolve_secondary_capabilities<'a>(
 fn resolve_workspace_root() -> Result<Option<String>> {
     if let Ok(env_root) = env::var("FENCE_WORKSPACE_ROOT") {
         if !env_root.is_empty() {
-            return Ok(Some(env_root));
+            return Ok(Some(canonicalize_string(env_root)));
         }
     }
 
@@ -709,23 +709,35 @@ fn resolve_workspace_root() -> Result<Option<String>> {
         if output.status.success() {
             let candidate = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !candidate.is_empty() {
-                return Ok(Some(candidate));
+                return Ok(Some(canonicalize_string(candidate)));
             }
         }
     }
 
     if let Ok(pwd) = env::var("PWD") {
         if !pwd.is_empty() {
-            return Ok(Some(pwd));
+            return Ok(Some(canonicalize_string(pwd)));
         }
     }
 
     let fallback = env::current_dir()?;
-    let display = fallback.display().to_string();
+    let display = canonicalize_pathbuf(fallback);
     if display.is_empty() {
         return Ok(None);
     }
     Ok(Some(display))
+}
+
+fn canonicalize_string(path: String) -> String {
+    let pathbuf = PathBuf::from(&path);
+    canonicalize_pathbuf(pathbuf)
+}
+
+fn canonicalize_pathbuf(path: PathBuf) -> String {
+    fs::canonicalize(&path)
+        .unwrap_or(path)
+        .display()
+        .to_string()
 }
 
 fn print_usage() {

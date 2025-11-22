@@ -6,8 +6,8 @@
 //! - wrap Codex sandbox/full invocations when requested
 //! - honor workspace overrides without silently falling back to host defaults
 
-use anyhow::{Context, Result, bail};
-use codex_fence::{codex_present, find_repo_root, resolve_probe};
+use anyhow::{Context, Result, anyhow, bail};
+use codex_fence::{ProbeMetadata, codex_present, find_repo_root, resolve_probe};
 use serde_json::json;
 use std::env;
 use std::env::VarError;
@@ -30,8 +30,10 @@ fn run() -> Result<()> {
     let workspace_root = canonicalize_path(&repo_root);
     let workspace_plan = determine_workspace_plan(&workspace_root, args.workspace_override)?;
     let resolved_probe = resolve_probe(&workspace_root, &args.probe_name)?;
+    let parsed_metadata = ProbeMetadata::from_script(&resolved_probe.path)?;
+    let resolved_metadata = resolve_probe_metadata(&resolved_probe, parsed_metadata)?;
     ensure_probe_executable(&resolved_probe.path)?;
-    let workspace_tmpdir = workspace_tmpdir(&workspace_root);
+    let workspace_tmpdir = workspace_tmpdir_plan(&workspace_plan, &workspace_root);
     let command_cwd = command_cwd_for(&workspace_plan, &workspace_root);
 
     let sandbox_mode = sandbox_mode_for_mode(&args.run_mode)?;
@@ -39,17 +41,29 @@ fn run() -> Result<()> {
     let command_spec = build_command_spec(&args.run_mode, &platform, &resolved_probe.path)?;
 
     if codex_mode(&args.run_mode) {
-        if let Some(tmpdir) = workspace_tmpdir.as_ref() {
+        if let Some(tmpdir) = workspace_tmpdir.path.as_ref() {
             if run_codex_preflight(
                 &repo_root,
                 &args.run_mode,
                 &platform,
                 tmpdir,
-                &resolved_probe.path,
+                &resolved_metadata,
             )? {
                 // Preflight emitted a denial record; skip running the probe.
                 return Ok(());
             }
+        } else if let Some((attempted, message)) = workspace_tmpdir.last_error.as_ref() {
+            let command_str = format!("mkdir -p {}", attempted.display());
+            emit_preflight_record(
+                &repo_root,
+                &resolved_metadata,
+                &args.run_mode,
+                attempted,
+                1,
+                message,
+                &command_str,
+            )?;
+            return Ok(());
         }
     }
 
@@ -58,7 +72,7 @@ fn run() -> Result<()> {
         &args.run_mode,
         &sandbox_mode,
         &workspace_plan,
-        workspace_tmpdir.as_deref(),
+        workspace_tmpdir.path.as_deref(),
         &command_cwd,
     )?;
     Ok(())
@@ -204,14 +218,40 @@ fn canonicalize_os_string(value: &OsString) -> OsString {
         .into_os_string()
 }
 
+/// Plan for the tmpdir export used by probes and codex preflight.
+struct TmpdirPlan {
+    path: Option<PathBuf>,
+    last_error: Option<(PathBuf, String)>,
+}
+
 /// Prefer a workspace-scoped tmp dir so probes land temp files inside the
-/// allowed tree even when system defaults are blocked.
-fn workspace_tmpdir(workspace_root: &Path) -> Option<PathBuf> {
-    let candidate = workspace_root.join("tmp");
-    if fs::create_dir_all(&candidate).is_ok() {
-        Some(canonicalize_path(&candidate))
-    } else {
-        None
+/// allowed tree even when system defaults are blocked. Falls back to the repo
+/// tmp when no workspace override is set.
+fn workspace_tmpdir_plan(workspace_plan: &WorkspacePlan, repo_root: &Path) -> TmpdirPlan {
+    let mut candidates = Vec::new();
+    if let Some(value) = workspace_plan.export_value.as_ref() {
+        candidates.push(PathBuf::from(value).join("tmp"));
+    }
+    if workspace_plan.export_value.is_none() {
+        candidates.push(repo_root.join("tmp"));
+    }
+
+    let mut last_error = None;
+    for candidate in candidates {
+        match fs::create_dir_all(&candidate) {
+            Ok(()) => {
+                return TmpdirPlan {
+                    path: Some(canonicalize_path(&candidate)),
+                    last_error: None,
+                }
+            }
+            Err(err) => last_error = Some((candidate, err.to_string())),
+        }
+    }
+
+    TmpdirPlan {
+        path: None,
+        last_error,
     }
 }
 
@@ -377,28 +417,6 @@ fn classify_preflight_error(stderr: &str) -> (&'static str, Option<&'static str>
     }
 }
 
-fn extract_probe_var(path: &Path, var: &str) -> Option<String> {
-    let contents = fs::read_to_string(path).ok()?;
-    for line in contents.lines() {
-        let trimmed = line.trim_start();
-        if !trimmed.starts_with(var) {
-            continue;
-        }
-        if let Some(rest) = trimmed.splitn(2, '=').nth(1) {
-            let val = rest
-                .split('#')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .trim_matches(|c| c == '"' || c == '\'');
-            if !val.is_empty() {
-                return Some(val.to_string());
-            }
-        }
-    }
-    None
-}
-
 fn write_temp_payload(value: &serde_json::Value) -> Result<PathBuf> {
     let mut file = NamedTempFile::new().context("create payload temp file")?;
     serde_json::to_writer(&mut file, value)?;
@@ -408,7 +426,7 @@ fn write_temp_payload(value: &serde_json::Value) -> Result<PathBuf> {
 
 fn emit_preflight_record(
     repo_root: &Path,
-    probe_path: &Path,
+    metadata: &ResolvedProbeMetadata,
     run_mode: &str,
     target_path: &Path,
     exit_code: i32,
@@ -416,14 +434,6 @@ fn emit_preflight_record(
     command_str: &str,
 ) -> Result<()> {
     let emit_record = codex_fence::resolve_helper_binary(repo_root, "emit-record")?;
-    let probe_file = probe_path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown");
-    let probe_id = probe_file.trim_end_matches(".sh");
-    let primary_capability = extract_probe_var(probe_path, "primary_capability_id")
-        .unwrap_or_else(|| "cap_fs_read_workspace_tree".to_string());
-    let probe_version = extract_probe_var(probe_path, "probe_version").unwrap_or_else(|| "1".to_string());
     let (status, errno, message) = classify_preflight_error(stderr);
 
     let payload = json!({
@@ -449,11 +459,11 @@ fn emit_preflight_record(
     cmd.arg("--run-mode")
         .arg(run_mode)
         .arg("--probe-name")
-        .arg(probe_id)
+        .arg(&metadata.id)
         .arg("--probe-version")
-        .arg(probe_version)
+        .arg(&metadata.version)
         .arg("--primary-capability-id")
-        .arg(primary_capability)
+        .arg(&metadata.primary_capability.0)
         .arg("--command")
         .arg(command_str)
         .arg("--category")
@@ -492,7 +502,7 @@ fn run_codex_preflight(
     run_mode: &str,
     platform: &str,
     workspace_tmpdir: &Path,
-    probe_path: &Path,
+    metadata: &ResolvedProbeMetadata,
 ) -> Result<bool> {
     // Detect hosts that block codex-managed writes before invoking the probe.
     // When blocked, emit a boundary object describing the denial so matrix runs
@@ -541,7 +551,7 @@ fn run_codex_preflight(
     let code = output.status.code().unwrap_or(-1);
     emit_preflight_record(
         repo_root,
-        probe_path,
+        metadata,
         run_mode,
         &target,
         code,
@@ -549,6 +559,29 @@ fn run_codex_preflight(
         &command_str,
     )?;
     Ok(true)
+}
+
+struct ResolvedProbeMetadata {
+    id: String,
+    version: String,
+    primary_capability: codex_fence::CapabilityId,
+}
+
+fn resolve_probe_metadata(
+    probe: &codex_fence::Probe,
+    parsed: ProbeMetadata,
+) -> Result<ResolvedProbeMetadata> {
+    let primary_capability = parsed.primary_capability.ok_or_else(|| {
+        anyhow!(
+            "probe {} is missing primary_capability_id",
+            probe.path.display()
+        )
+    })?;
+    Ok(ResolvedProbeMetadata {
+        id: parsed.probe_name.unwrap_or_else(|| probe.id.clone()),
+        version: parsed.probe_version.unwrap_or_else(|| "1".to_string()),
+        primary_capability,
+    })
 }
 
 #[cfg(test)]
@@ -598,10 +631,80 @@ mod tests {
     fn workspace_tmpdir_prefers_workspace_tree() {
         let workspace = TempWorkspace::new();
         let canonical_root = canonicalize_path(&workspace.root);
-        let tmpdir = workspace_tmpdir(&canonical_root).expect("tmpdir");
+        let plan = workspace_plan_from_override(WorkspaceOverride::UsePath(
+            canonical_root.clone().into_os_string(),
+        ));
+        let tmpdir_plan = workspace_tmpdir_plan(&plan, &canonical_root);
+        let tmpdir = tmpdir_plan.path.expect("tmpdir");
         assert!(tmpdir.starts_with(&canonical_root));
         assert!(tmpdir.ends_with("tmp"));
         assert!(tmpdir.is_dir());
+    }
+
+    #[test]
+    fn workspace_tmpdir_uses_override_when_present() {
+        let workspace = TempWorkspace::new();
+        let override_root = workspace.root.join("custom_workspace");
+        fs::create_dir_all(&override_root).unwrap();
+        let plan = workspace_plan_from_override(WorkspaceOverride::UsePath(
+            override_root.clone().into_os_string(),
+        ));
+        let tmpdir_plan = workspace_tmpdir_plan(&plan, &workspace.root);
+        let tmpdir = tmpdir_plan.path.expect("tmpdir");
+        let override_canonical = canonicalize_path(&override_root);
+        assert!(tmpdir.starts_with(&override_canonical));
+    }
+
+    #[test]
+    fn workspace_tmpdir_records_error_when_all_candidates_fail() {
+        let workspace = TempWorkspace::new();
+        let override_file = workspace.root.join("override_marker");
+        fs::write(&override_file, "marker").unwrap();
+        let plan = workspace_plan_from_override(WorkspaceOverride::UsePath(
+            override_file.into_os_string(),
+        ));
+        let tmpdir_plan = workspace_tmpdir_plan(&plan, &workspace.root);
+        assert!(tmpdir_plan.path.is_none());
+        let (attempted, message) = tmpdir_plan
+            .last_error
+            .expect("expected an error recorded");
+        assert!(!message.is_empty());
+        // Attempted tmpdir should reflect the override path.
+        assert!(attempted.ends_with("tmp"));
+    }
+
+    #[test]
+    fn resolve_probe_metadata_prefers_script_values() {
+        let workspace = TempWorkspace::new();
+        let probes = workspace.root.join("probes");
+        fs::create_dir_all(&probes).unwrap();
+        let script = probes.join("meta.sh");
+        fs::write(
+            &script,
+            r#"#!/usr/bin/env bash
+probe_name="custom_probe"
+probe_version="2"
+primary_capability_id="cap_fs_read_workspace_tree"
+        "#,
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&script).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&script, perms).unwrap();
+        }
+
+        let parsed = ProbeMetadata::from_script(&script).unwrap();
+        let probe = codex_fence::Probe {
+            id: "meta".to_string(),
+            path: fs::canonicalize(&script).unwrap(),
+        };
+        let resolved = resolve_probe_metadata(&probe, parsed).unwrap();
+        assert_eq!(resolved.id, "custom_probe");
+        assert_eq!(resolved.version, "2");
+        assert_eq!(resolved.primary_capability.0, "cap_fs_read_workspace_tree");
     }
 
     #[test]
