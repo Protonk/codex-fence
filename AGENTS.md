@@ -17,7 +17,8 @@
 ## Layered contracts (read before editing those areas)
 - `probes/AGENTS.md` — Probe author contract: one observable action per script, cfbo-v1 emission rules, capability metadata selection.
 - `tests/AGENTS.md` — Structure of the test harness, fixture locations, and guidance for fast vs. second-tier suites.
-- `src/bin/AGENTS.md` — Guarantees for the Rust helpers (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, etc.); keep their CLIs and stack metadata stable.
+- `src/bin/AGENTS.md` - Structure and expectations for Rust code, exclusive of the helpers in...
+  - `src/bin/AGENTS.md` — Guarantees for the Rust helpers (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, etc.); keep their CLIs and stack metadata stable.
 - `tools/AGENTS.md` — Explains the tool calls available to you.
 - `docs/AGENTS.md` — How explanatory docs relate to machine contracts; update entries there whenever you add a new explainer.
 
