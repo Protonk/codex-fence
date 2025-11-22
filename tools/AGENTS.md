@@ -1,6 +1,6 @@
 # Tools Playbook for Agents
 
-This directory hosts helpers for automated agents developing in the repo.
+This directory hosts helpers for automated agents developing in the repo as well as audit scripts and reports in the `audits/` subdirectory.
 
 ## Available tooling
 
@@ -9,7 +9,6 @@ This directory hosts helpers for automated agents developing in the repo.
 - `resolve_paths.sh`: canonicalizes probe paths and exports the `resolve_probe_script_path`
   + `portable_realpath` helpers shared by the contract tools.
 - `list_run_modes.sh`: canonical list + parser for supported run modes.
-- `audits/INTERPRETERS.md`: AI agent prompts for audits.
 
 ## Modfiying tooling
 Before changing or adding tooling:
@@ -24,3 +23,9 @@ Before changing or adding tooling:
   future agents understand the blast radius and know which invariants the tool
   defends.
 - The static probe contract must stay portable (`/bin/bash 3.2` on macOS), silent on success, and deterministic. The Rust guard rails inherit the same expectations even though they run through Cargo.
+
+## Audits
+
+Automated agents will usually only need to interest themselves with the `audits/` subdirectory if they are directed to engage in an audit. Those agents are usually directed to `tools/audits/INTERPRETERS.md` which has one or more audit personas. 
+
+Reports of audits are checked in to subdirectories of `audits/` as dated folders with an audit and remediation summary. 
