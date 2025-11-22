@@ -31,21 +31,17 @@
       "required": [
         "codex_cli_version",
         "codex_profile",
-        "codex_model",
         "sandbox_mode",
-        "os",
-        "container_tag"
+        "os"
       ],
       "properties": {
         "codex_cli_version": { "type": ["string", "null"] },
         "codex_profile": { "type": ["string", "null"] },
-        "codex_model": { "type": ["string", "null"] },
         "sandbox_mode": {
           "type": ["string", "null"],
           "enum": ["read-only", "workspace-write", "danger-full-access", null]
         },
-        "os": { "type": "string" },
-        "container_tag": { "type": "string" }
+        "os": { "type": "string" }
       }
     },
     "probe": {

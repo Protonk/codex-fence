@@ -158,10 +158,8 @@ Matching JSON output (trimmed for brevity):
   "stack": {
     "codex_cli_version": "codex 1.2.3",
     "codex_profile": "Auto",
-    "codex_model": "gpt-4",
     "sandbox_mode": "workspace-write",
-    "os": "Darwin 23.3.0 arm64",
-    "container_tag": "local-macos"
+    "os": "Darwin 23.3.0 arm64"
   }
 }
 ```

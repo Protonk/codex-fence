@@ -32,8 +32,8 @@ pub struct BoundaryObject {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Environment metadata emitted by `detect-stack`.
 ///
-/// All fields are optional except `os`/`container_tag`, which always carry a
-/// platform description so downstream consumers can correlate results with host
+/// All fields are optional except `os`, which always carries a platform
+/// description so downstream consumers can correlate results with host
 /// characteristics.
 pub struct StackInfo {
     #[serde(default)]
@@ -41,11 +41,8 @@ pub struct StackInfo {
     #[serde(default)]
     pub codex_profile: Option<String>,
     #[serde(default)]
-    pub codex_model: Option<String>,
-    #[serde(default)]
     pub sandbox_mode: Option<String>,
     pub os: String,
-    pub container_tag: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,10 +205,8 @@ mod tests {
             stack: StackInfo {
                 codex_cli_version: Some("1.0".to_string()),
                 codex_profile: None,
-                codex_model: Some("gpt".to_string()),
                 sandbox_mode: Some("workspace-write".to_string()),
                 os: "Darwin".to_string(),
-                container_tag: "local-macos".to_string(),
             },
             probe: ProbeInfo {
                 id: "probe".to_string(),

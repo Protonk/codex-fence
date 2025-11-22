@@ -45,10 +45,8 @@ Populated automatically by `bin/detect-stack`.
 | --- | --- | --- |
 | `codex_cli_version` | yes (nullable) | Output of `codex --version` if available, else `null`. |
 | `codex_profile` | yes (nullable) | Codex profile name if known (`FENCE_CODEX_PROFILE`). |
-| `codex_model` | yes (nullable) | Model used for the run if known, else `null`. |
 | `sandbox_mode` | yes (nullable) | `read-only`, `workspace-write`, `danger-full-access`, or `null` for baseline runs. |
 | `os` | yes | Value from `uname -srm`. |
-| `container_tag` | yes | Host/container label (e.g., `local-macos`, `local-linux`). |
 
 ### `probe`
 
@@ -174,10 +172,8 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
   "stack": {
     "codex_cli_version": "codex 1.2.3",
     "codex_profile": "Auto",
-    "codex_model": "gpt-4",
     "sandbox_mode": "workspace-write",
-    "os": "Darwin 23.3.0 arm64",
-    "container_tag": "local-macos"
+    "os": "Darwin 23.3.0 arm64"
   }
 }
 ```
