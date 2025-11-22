@@ -2,6 +2,12 @@
 name = "codex-fence"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Empirical sandbox probe harness for the Codex CLI that records boundary observations as JSON"
+readme = "README.md"
+license = "Apache-2.0"
+repository = "https://github.com/Protonk/codex-fence"
+default-run = "codex-fence"
 build = "build.rs"
 
 [dependencies]
@@ -16,18 +22,22 @@ tempfile = "3.10"
 [[bin]]
 name = "fence-bang"
 path = "src/bin/fence_bang.rs"
+test = false
 
 [[bin]]
 name = "fence-listen"
 path = "src/bin/fence_listen.rs"
+test = false
 
 [[bin]]
 name = "fence-test"
 path = "src/bin/fence_test.rs"
+test = false
 
 [[bin]]
 name = "portable-path"
 path = "src/bin/portable_path.rs"
+test = false
 
 [[bin]]
 name = "emit-record"
@@ -36,6 +46,7 @@ path = "src/bin/emit_record.rs"
 [[bin]]
 name = "detect-stack"
 path = "src/bin/detect_stack.rs"
+test = false
 
 [[bin]]
 name = "fence-run"
@@ -44,7 +55,9 @@ path = "src/bin/fence_run.rs"
 [[bin]]
 name = "codex-fence"
 path = "src/bin/codex_fence.rs"
+test = false
 
 [[bin]]
 name = "json-extract"
 path = "src/bin/json_extract.rs"
+test = false

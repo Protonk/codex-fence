@@ -1,6 +1,6 @@
 # codex-fence
 
-An empirical security notebook for the `codex` CLI. `codex-fence` hammers on
+An empirical security notebook for the [codex CLI](https://github.com/openai/codex). `codex-fence` hammers on
 sandbox boundaries with dozens of tiny probes, watches what gets through, and
 writes every observation down as JSON. It never talks to models; it just asks
 “what can this runtime do?” and refuses to guess.
@@ -24,42 +24,30 @@ policy regression because a model deleted your notes. Running a pile of small,
 paranoid probes gives you an empirical read on what the fence actually allows
 today—no speculation, no trust in host metadata.
 
-## How it works (one page version)
+## How it works
 
+Everything in the repo exists to turn a capability into an auditable signal:
 1. **Capability catalog**: `schema/capabilities.json` lists the behaviors we
    care about (fs, net, proc, sandbox). Rust code indexes it; docs live in
-   `docs/capabilities.md`.
+   [docs/capabilities.md](docs/capabilities.md).
 2. **Probes**: `probes/<id>.sh` is portable Bash (`set -euo pipefail`), performs
    one focused action, and calls `bin/emit-record` once. Helpers (`bin/` +
-   `lib/`) provide path canonicalization, JSON extraction, etc.
+   `lib/`) provide path canonicalization, JSON extraction, etc. See [docs/probes.md](docs/probes.md) for probe and Probe Author information.
 3. **Execution**: `bin/fence-run <mode> <probe>` exports `FENCE_*` context and
    enforces the requested mode (`baseline`, `codex-sandbox`, `codex-full`).
-   Codex modes preflight sandbox write access and will emit a `preflight` denial
-   record if the host blocks them from creating temp dirs.
 4. **Serialization**: `emit-record` validates capability IDs, pulls stack info
    from `detect-stack`, and serializes a cfbo-v1 record. Everything is strict:
-   bad flags are fatal, capability IDs must exist in the catalog.
+   bad flags are fatal, capability IDs must exist in the catalog. [docs/boundary_object.md](docs/boundary_object.md) contains field-by-field detail.
 5. **Signals**: Runs land in `out/<probe>.<mode>.json`. Diff across modes,
    commits, or hosts to see policy changes.
 
-See `docs/boundary_object.md` for field-by-field detail; `docs/probes.md` for a
-probe author walkthrough.
+### Probes
 
-## Probe contract (runtime reality)
+Probes are small tests of a validated capability, written to conform to "one probe, one action." They start with `#!/usr/bin/env bash` + `set -euo pipefail`, never read stdin and leave stdout as the only JSON record. Probe Authors use helpers, not bespoke parsing, to structure informative payloads which declare capabilities accurately (`--primary-capability-id`), record the exact command, and normalize status to `success|denied|partial|error`. Portability (macOS `/bin/bash 3.2` and `codex-universal` container are baselines) minimizes noise. 
 
-- One probe, one action. `#!/usr/bin/env bash` + `set -euo pipefail`; never read
-  stdin; stdout is only the JSON record.
-- Use helpers, not bespoke parsing: payloads/args built with `emit-record`
-  flags (`--payload-stdout/-stderr`, `--payload-raw-field[-json|-list|-null]`,
-  `--operation-arg[...]`). Parse JSON with `bin/json-extract` if you must.
-- Declare capabilities accurately (`--primary-capability-id`), record the exact
-  command you ran, and normalize status to `success|denied|partial|error` with
-  sensible errno/message. If a required tool is missing, fail explicitly.
-- Stay portable: macOS `/bin/bash 3.2` and `codex-universal` container are
-  baselines. Use `bin/portable-path` for `realpath/relpath`.
+### Modes
 
-## Modes
-
+`codex-fence` runs in three modes to test two known `codex` CLI modes.
 - `baseline`: run the probe directly.
 - `codex-sandbox`: `codex sandbox macos --full-auto -- <probe>`; workspace-write
   Seatbelt profile, requires the Codex CLI.
@@ -95,11 +83,14 @@ Outputs land in `out/` for diffing.
 
 ## Tests & guard rails
 
-- Fast loop: `tools/validate_contract_gate.sh --probe <id>` (or `make probe
-  PROBE=<id>`) for static + dynamic contract checks on one probe.
+Project tests:
+- `cargo test` exercises unit helpers plus CLI smokes; binaries are built
+  automatically for the integration suites.
 - Repo-wide: `bin/fence-test` runs the static contract across all probes.
 - Rust guard rails: `cargo test --test suite` (schema validation, harness
   smokes, dynamic gate coverage, json-extract semantics).
+
+Probe Authors have access to an interpreted probe contract validator for use in fast authoring loops. Run `tools/validate_contract_gate.sh --probe <id>` (or `make probe PROBE=<id>`) for static + dynamic contract checks on one probe.
 
 ## Repo map
 
