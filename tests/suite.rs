@@ -2,9 +2,11 @@
 
 // Centralized integration suite for the fence harness; exercises schema validation,
 // probe resolution rules, and helper utilities so changes surface in one place.
+mod common;
 
 use anyhow::{Context, Result, bail};
-use codex_fence::{BoundaryObject, find_repo_root};
+use codex_fence::BoundaryObject;
+use common::{helper_binary, repo_root, run_command};
 use jsonschema::JSONSchema;
 use serde_json::{Value, json};
 use std::env;
@@ -13,7 +15,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use tempfile::{NamedTempFile, TempDir};
 
@@ -731,49 +733,10 @@ fn repo_guard() -> RepoGuard {
     RepoGuard { _guard: guard }
 }
 
-fn repo_root() -> PathBuf {
-    find_repo_root().expect("tests require repository root")
-}
-
 fn parse_boundary_object(bytes: &[u8]) -> Result<(BoundaryObject, Value)> {
     let value: Value = serde_json::from_slice(bytes)?;
     let record: BoundaryObject = serde_json::from_value(value.clone())?;
     Ok((record, value))
-}
-
-fn run_command(cmd: Command) -> Result<Output> {
-    let mut cmd = cmd;
-    let output = cmd
-        .output()
-        .with_context(|| format!("failed to run command: {:?}", cmd))?;
-    if output.status.success() {
-        Ok(output)
-    } else {
-        bail!(
-            "command {:?} failed: status {:?}\nstdout: {}\nstderr: {}",
-            cmd,
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        )
-    }
-}
-
-fn helper_binary(repo_root: &Path, name: &str) -> PathBuf {
-    let candidates = [
-        repo_root.join("target").join("debug").join(name),
-        repo_root.join("target").join("release").join(name),
-        repo_root.join("bin").join(name),
-    ];
-    for candidate in candidates {
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    panic!(
-        "unable to locate helper {} (checked target/debug, target/release, bin)",
-        name
-    );
 }
 
 fn sanitized_path_without_codex() -> Result<OsString> {

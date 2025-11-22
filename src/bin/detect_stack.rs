@@ -113,28 +113,3 @@ fn usage_and_exit() -> ! {
     eprintln!("Usage: detect-stack [RUN_MODE]");
     std::process::exit(1);
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sandbox_mode_baseline_is_none() {
-        assert_eq!(determine_sandbox_mode("baseline", None).unwrap(), None);
-    }
-
-    #[test]
-    fn sandbox_mode_codex_sandbox_defaults() {
-        assert_eq!(
-            determine_sandbox_mode("codex-sandbox", None).unwrap(),
-            Some("workspace-write".to_string())
-        );
-    }
-
-    #[test]
-    fn sandbox_mode_codex_full_env_override() {
-        let result =
-            determine_sandbox_mode("codex-full", Some("custom-profile".to_string())).unwrap();
-        assert_eq!(result, Some("custom-profile".to_string()));
-    }
-}

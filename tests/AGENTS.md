@@ -26,6 +26,10 @@ public boundary-object schema. The directory is split into two layers:
   `cargo test --test suite workspace_root_fallback`) to focus on one
   failing case. They only depend on in-repo helpers.
 
+Shared test helpers live in `tests/common.rs`; they build the helper binaries
+once for the suite so `cargo test` and the CLI smokes (`tests/bin_smoke.rs`)
+can run without extra setup.
+
 ## Library components
 
 - Schema validation now lives entirely in the Rust guard rails—run
@@ -54,6 +58,11 @@ tests. Target a specific scenario with `cargo test --test suite <name>`.
 
 Add any heavier “whole repo” validation here. Follow the same structure: short-
 circuit on missing prerequisites, and print `name: PASS/FAIL` summaries.
+
+Additional CLI smokes live in `tests/bin_smoke.rs` to keep the small helper
+binaries honest (codex-fence path resolution, detect-stack modes,
+json-extract defaults, portable-path relpath). They reuse the shared helpers
+above and run as part of `cargo test`.
 
 ## Adding or modifying tests
 

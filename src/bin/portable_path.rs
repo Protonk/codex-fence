@@ -143,32 +143,3 @@ fn compute_relpath(target: &Path, base: &Path) -> PathBuf {
 
     relative
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn relpath_same_dir() {
-        let base = Path::new("/tmp/workspace");
-        let target = Path::new("/tmp/workspace/probes/run.sh");
-        let rel = compute_relpath(target, base);
-        assert_eq!(rel, PathBuf::from("probes/run.sh"));
-    }
-
-    #[test]
-    fn relpath_parent() {
-        let base = Path::new("/tmp/workspace/probes");
-        let target = Path::new("/tmp/workspace/docs/spec.md");
-        let rel = compute_relpath(target, base);
-        assert_eq!(rel, PathBuf::from("../docs/spec.md"));
-    }
-
-    #[test]
-    fn relpath_identical() {
-        let base = Path::new("/tmp/workspace");
-        let target = Path::new("/tmp/workspace");
-        let rel = compute_relpath(target, base);
-        assert_eq!(rel, PathBuf::from("."));
-    }
-}
