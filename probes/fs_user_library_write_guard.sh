@@ -29,6 +29,8 @@ status="error"
 errno_value=""
 message=""
 raw_exit_code=""
+target_exists_after_attempt="false"
+target_exists_after_final="false"
 
 if [[ ! -d "${target_dir}" ]]; then
   status="error"
@@ -56,8 +58,15 @@ else
   lower_err=$(printf '%s' "${stderr_text}" | tr 'A-Z' 'a-z')
 
   if [[ ${exit_code} -eq 0 ]]; then
-    status="success"
-    message="Write to ~/Library/Preferences succeeded"
+    if [[ -e "${target_file}" ]]; then
+      target_exists_after_attempt="true"
+      status="success"
+      message="Write to ~/Library/Preferences succeeded"
+    else
+      status="partial"
+      errno_value="ENOENT"
+      message="Write reported success but target file missing"
+    fi
   elif [[ "${lower_err}" == *"permission denied"* ]]; then
     status="denied"
     errno_value="EACCES"
@@ -75,20 +84,15 @@ else
     message="Write attempt failed with exit code ${exit_code}"
   fi
 
-  target_exists_after="false"
-  if [[ -e "${target_file}" ]]; then
-    target_exists_after="true"
-  fi
-
-  # Remove probe-created files so repeated runs do not leave artifacts behind.
-  if [[ "${status}" == "success" && "${existed_before}" != "true" ]]; then
+  target_exists_after_final="${target_exists_after_attempt}"
+  if [[ "${status}" == "success" && "${target_exists_after_attempt}" == "true" && "${existed_before}" != "true" ]]; then
     if rm -f "${target_file}" 2>/dev/null; then
-      target_exists_after="false"
+      target_exists_after_final="false"
     else
       if [[ -e "${target_file}" ]]; then
-        target_exists_after="true"
+        target_exists_after_final="true"
       else
-        target_exists_after="false"
+        target_exists_after_final="false"
       fi
     fi
   fi
@@ -118,10 +122,11 @@ fi
   --payload-stderr "${stderr_text:-}" \
   --payload-raw-field "target_file" "${target_file}" \
   --payload-raw-field "target_dir" "${target_dir}" \
-  --payload-raw-field-json "existed_before" "${existed_before:-false}" \
-  --payload-raw-field-json "exists_after" "${target_exists_after:-false}" \
+  --payload-raw-field "existed_before" "${existed_before:-false}" \
+  --payload-raw-field "exists_after_attempt" "${target_exists_after_attempt:-false}" \
+  --payload-raw-field "exists_after" "${target_exists_after_final:-false}" \
   --payload-raw-field "attempt_line" "${attempt_line}" \
-  --payload-raw-field-json "attempt_bytes" "${attempt_bytes}" \
+  --payload-raw-field "attempt_bytes" "${attempt_bytes}" \
   "${denial_flag[@]}" \
   --operation-arg "target_file" "${target_file}" \
   --operation-arg "target_dir" "${target_dir}" \

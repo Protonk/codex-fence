@@ -413,7 +413,9 @@ fn static_probe_contract_accepts_fixture() -> Result<()> {
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
     let mut cmd = Command::new(repo_root.join("tools/validate_contract_gate.sh"));
-    cmd.arg("--probe").arg(fixture.probe_id()).arg("--static-only");
+    cmd.arg("--probe")
+        .arg(fixture.probe_id())
+        .arg("--static-only");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -455,7 +457,9 @@ primary_capability_id="cap_fs_read_workspace_tree"
         FixtureProbe::install_from_contents(&repo_root, "tests_static_contract_broken", contents)?;
 
     let mut cmd = Command::new(repo_root.join("tools/validate_contract_gate.sh"));
-    cmd.arg("--probe").arg(broken.probe_id()).arg("--static-only");
+    cmd.arg("--probe")
+        .arg(broken.probe_id())
+        .arg("--static-only");
     let output = cmd
         .output()
         .context("failed to execute static probe contract")?;
@@ -510,7 +514,11 @@ fn json_extract_enforces_pointer_and_type() -> Result<()> {
     let repo_root = repo_root();
     let helper = helper_binary(&repo_root, "json-extract");
     let mut file = NamedTempFile::new().context("failed to create json fixture")?;
-    writeln!(file, "{}", r#"{"nested":{"flag":true},"number":7,"text":"hello"}"#)?;
+    writeln!(
+        file,
+        "{}",
+        r#"{"nested":{"flag":true},"number":7,"text":"hello"}"#
+    )?;
 
     // Happy path: extract nested flag as bool.
     let mut ok_cmd = Command::new(&helper);
@@ -570,12 +578,17 @@ probe_name="tests_contract_gate_static_violation"
 primary_capability_id="cap_fs_read_workspace_tree"
 exit 0
 "#;
-    let broken =
-        FixtureProbe::install_from_contents(&repo_root, "tests_contract_gate_static_violation", contents)?;
+    let broken = FixtureProbe::install_from_contents(
+        &repo_root,
+        "tests_contract_gate_static_violation",
+        contents,
+    )?;
 
     let mut cmd = Command::new(repo_root.join("bin/probe-contract-gate"));
     cmd.arg(broken.probe_id());
-    let output = cmd.output().context("failed to execute probe-contract-gate")?;
+    let output = cmd
+        .output()
+        .context("failed to execute probe-contract-gate")?;
     assert!(
         !output.status.success(),
         "probe-contract-gate should fail when static contract is violated"

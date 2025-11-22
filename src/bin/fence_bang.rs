@@ -34,8 +34,7 @@ fn run() -> Result<()> {
     for mode in modes {
         for probe in &probes {
             if let Err(err) = run_probe(&repo_root, probe, &mode) {
-                let message =
-                    format!("probe {} in mode {} failed: {err:#}", probe.id, mode);
+                let message = format!("probe {} in mode {} failed: {err:#}", probe.id, mode);
                 eprintln!("fence-bang: {message}");
                 errors.push(message);
             }

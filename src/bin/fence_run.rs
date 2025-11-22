@@ -15,6 +15,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::SystemTime;
 use tempfile::NamedTempFile;
 
 fn main() {
@@ -243,7 +244,7 @@ fn workspace_tmpdir_plan(workspace_plan: &WorkspacePlan, repo_root: &Path) -> Tm
                 return TmpdirPlan {
                     path: Some(canonicalize_path(&candidate)),
                     last_error: None,
-                }
+                };
             }
             Err(err) => last_error = Some((candidate, err.to_string())),
         }
@@ -325,15 +326,9 @@ fn build_command_spec(run_mode: &str, platform: &str, probe_path: &Path) -> Resu
             })
         }
         "codex-full" => {
-            ensure_codex_available()?;
-            // Avoid the sandbox helper here; the global flag already removes the Seatbelt profile.
             Ok(CommandSpec {
-                program: OsString::from("codex"),
-                args: vec![
-                    OsString::from("--dangerously-bypass-approvals-and-sandbox"),
-                    OsString::from("--"),
-                    probe_arg,
-                ],
+                program: probe_arg,
+                args: Vec::new(),
             })
         }
         other => bail!("Unknown mode: {other}"),
@@ -409,9 +404,17 @@ fn run_command(
 fn classify_preflight_error(stderr: &str) -> (&'static str, Option<&'static str>, String) {
     let lower = stderr.to_ascii_lowercase();
     if lower.contains("operation not permitted") {
-        ("denied", Some("EPERM"), "codex sandbox preflight denied (operation not permitted)".to_string())
+        (
+            "denied",
+            Some("EPERM"),
+            "codex sandbox preflight denied (operation not permitted)".to_string(),
+        )
     } else if lower.contains("permission denied") {
-        ("denied", Some("EACCES"), "codex sandbox preflight denied (permission denied)".to_string())
+        (
+            "denied",
+            Some("EACCES"),
+            "codex sandbox preflight denied (permission denied)".to_string(),
+        )
     } else {
         ("error", None, "codex sandbox preflight failed".to_string())
     }
@@ -491,7 +494,10 @@ fn emit_preflight_record(
 
     let status_out = cmd.status().context("failed to emit preflight record")?;
     if !status_out.success() {
-        bail!("emit-record failed for preflight (exit {:?})", status_out.code());
+        bail!(
+            "emit-record failed for preflight (exit {:?})",
+            status_out.code()
+        );
     }
 
     Ok(())
@@ -508,7 +514,11 @@ fn run_codex_preflight(
     // When blocked, emit a boundary object describing the denial so matrix runs
     // keep producing output for the affected mode.
     ensure_codex_available()?;
-    let target = workspace_tmpdir.join("codex-preflight.XXXXXX");
+    let suffix = SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_micros();
+    let target = workspace_tmpdir.join(format!("codex-preflight-{suffix}"));
 
     let mut args: Vec<OsString> = Vec::new();
     match run_mode {
@@ -517,18 +527,13 @@ fn run_codex_preflight(
             args.push(OsString::from("sandbox"));
             args.push(OsString::from(platform_target));
             args.push(OsString::from("--full-auto"));
+            args.push(OsString::from("--"));
+            args.push(OsString::from("/bin/mkdir"));
+            args.push(OsString::from(target.as_os_str()));
         }
-        "codex-full" => {
-            args.push(OsString::from("--dangerously-bypass-approvals-and-sandbox"));
-        }
+        "codex-full" => return Ok(false),
         _ => return Ok(false),
     }
-    args.push(OsString::from("--"));
-    args.push(OsString::from("/usr/bin/mktemp"));
-    args.push(OsString::from("-d"));
-    args.push(OsString::from(
-        target.as_os_str().to_string_lossy().to_string(),
-    ));
 
     let command_str = format!(
         "codex {}",
@@ -544,6 +549,8 @@ fn run_codex_preflight(
     let output = cmd.output().context("codex preflight failed to spawn")?;
 
     if output.status.success() {
+        // Clean up the directory if we successfully created it.
+        let _ = fs::remove_dir_all(&target);
         return Ok(false);
     }
 
@@ -665,9 +672,7 @@ mod tests {
         ));
         let tmpdir_plan = workspace_tmpdir_plan(&plan, &workspace.root);
         assert!(tmpdir_plan.path.is_none());
-        let (attempted, message) = tmpdir_plan
-            .last_error
-            .expect("expected an error recorded");
+        let (attempted, message) = tmpdir_plan.last_error.expect("expected an error recorded");
         assert!(!message.is_empty());
         // Attempted tmpdir should reflect the override path.
         assert!(attempted.ends_with("tmp"));

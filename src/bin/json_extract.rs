@@ -88,7 +88,9 @@ impl ValueType {
             "number" => Ok(Self::Number),
             "bool" | "boolean" => Ok(Self::Bool),
             "null" => Ok(Self::Null),
-            other => bail!("unknown type '{other}' (expected object|array|string|number|bool|null)"),
+            other => {
+                bail!("unknown type '{other}' (expected object|array|string|number|bool|null)")
+            }
         }
     }
 
@@ -138,9 +140,7 @@ impl InputSource {
             }
             InputSource::Stdin => {
                 let mut buf = Vec::new();
-                io::stdin()
-                    .read_to_end(&mut buf)
-                    .context("reading stdin")?;
+                io::stdin().read_to_end(&mut buf).context("reading stdin")?;
                 Ok(buf)
             }
         }
@@ -242,7 +242,10 @@ mod tests {
 
     #[test]
     fn parse_expected_type_variants() {
-        assert!(matches!(ValueType::from_str("object"), Ok(ValueType::Object)));
+        assert!(matches!(
+            ValueType::from_str("object"),
+            Ok(ValueType::Object)
+        ));
         assert!(ValueType::from_str("bool").is_ok());
         assert!(ValueType::from_str("boolean").is_ok());
         assert!(ValueType::from_str("unknown").is_err());

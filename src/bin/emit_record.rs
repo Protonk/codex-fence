@@ -188,27 +188,19 @@ impl CliArgs {
                 }
                 "--payload-stdout" => {
                     let value = next_value(&mut args, "--payload-stdout")?;
-                    config
-                        .payload
-                        .set_stdout(TextSource::Inline(value))?;
+                    config.payload.set_stdout(TextSource::Inline(value))?;
                 }
                 "--payload-stdout-file" => {
                     let value = PathBuf::from(next_value(&mut args, "--payload-stdout-file")?);
-                    config
-                        .payload
-                        .set_stdout(TextSource::File(value))?;
+                    config.payload.set_stdout(TextSource::File(value))?;
                 }
                 "--payload-stderr" => {
                     let value = next_value(&mut args, "--payload-stderr")?;
-                    config
-                        .payload
-                        .set_stderr(TextSource::Inline(value))?;
+                    config.payload.set_stderr(TextSource::Inline(value))?;
                 }
                 "--payload-stderr-file" => {
                     let value = PathBuf::from(next_value(&mut args, "--payload-stderr-file")?);
-                    config
-                        .payload
-                        .set_stderr(TextSource::File(value))?;
+                    config.payload.set_stderr(TextSource::File(value))?;
                 }
                 "--payload-raw" => {
                     let value = next_value(&mut args, "--payload-raw")?;
@@ -219,10 +211,7 @@ impl CliArgs {
                 }
                 "--payload-raw-file" => {
                     let value = PathBuf::from(next_value(&mut args, "--payload-raw-file")?);
-                    config
-                        .payload
-                        .raw
-                        .merge_json_file(&value, "payload raw")?;
+                    config.payload.raw.merge_json_file(&value, "payload raw")?;
                 }
                 "--payload-raw-field" => {
                     let key = next_value(&mut args, "--payload-raw-field")?;
@@ -487,8 +476,10 @@ impl JsonObjectBuilder {
     }
 
     fn insert_null(&mut self, key: String) {
-        self.sources
-            .push(JsonValueSource::SetField { key, value: Value::Null });
+        self.sources.push(JsonValueSource::SetField {
+            key,
+            value: Value::Null,
+        });
     }
 
     fn insert_list(&mut self, key: String, values: Vec<String>) {
@@ -838,9 +829,7 @@ mod tests {
         assert_eq!(obj.get("a").and_then(Value::as_i64), Some(1));
         assert_eq!(obj.get("b").and_then(Value::as_str), Some("override"));
         assert_eq!(
-            obj.get("c")
-                .and_then(Value::as_array)
-                .map(|arr| arr.len()),
+            obj.get("c").and_then(Value::as_array).map(|arr| arr.len()),
             Some(2)
         );
         assert_eq!(obj.get("d").and_then(Value::as_bool), Some(true));
@@ -858,21 +847,19 @@ mod tests {
         payload.raw.insert_null("raw_key".to_string());
         let built = payload.build().expect("payload build");
         assert_eq!(
-            built
-                .pointer("/stdout_snippet")
-                .and_then(Value::as_str),
+            built.pointer("/stdout_snippet").and_then(Value::as_str),
             Some("hello")
         );
         assert_eq!(
-            built
-                .pointer("/stderr_snippet")
-                .and_then(Value::as_str),
+            built.pointer("/stderr_snippet").and_then(Value::as_str),
             Some("stderr")
         );
-        assert!(built
-            .pointer("/raw/raw_key")
-            .map(|v| v.is_null())
-            .unwrap_or(false));
+        assert!(
+            built
+                .pointer("/raw/raw_key")
+                .map(|v| v.is_null())
+                .unwrap_or(false)
+        );
     }
 
     fn sample_index(entries: &[(&str, &str, &str)]) -> CapabilityIndex {
