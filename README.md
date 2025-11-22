@@ -1,4 +1,5 @@
 # codex-fence
+>Empirically maps codex CLI sandbox capabilities with tiny probes and JSON logs.
 
 An empirical security notebook for the [codex CLI](https://github.com/openai/codex). `codex-fence` hammers on
 sandbox boundaries with dozens of tiny probes, watches what gets through, and
