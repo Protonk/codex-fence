@@ -71,17 +71,19 @@ else
   fi
 fi
 
-network_disabled_json="null"
+network_disabled_field=(--payload-raw-null "network_disabled_env")
 if [[ -n "${network_disabled_env}" ]]; then
-  network_disabled_json=$(printf '"%s"' "${network_disabled_env}" | sed 's/"/\\"/g')
+  network_disabled_field=(--payload-raw-field "network_disabled_env" "${network_disabled_env}")
 fi
-status_line_json="null"
+
+status_line_field=(--payload-raw-null "status_line")
 if [[ -n "${status_line}" ]]; then
-  status_line_json=$(printf '"%s"' "${status_line}" | sed 's/"/\\"/g')
+  status_line_field=(--payload-raw-field "status_line" "${status_line}")
 fi
-http_status_json="null"
+
+http_status_field=(--payload-raw-null "http_status")
 if [[ -n "${http_status}" ]]; then
-  http_status_json=$(printf '"%s"' "${http_status}" | sed 's/"/\\"/g')
+  http_status_field=(--payload-raw-field "http_status" "${http_status}")
 fi
 connect_timeout_json="${connect_timeout}"
 max_time_json="${max_time}"
@@ -103,11 +105,11 @@ max_time_json="${max_time}"
   --payload-stderr "${stderr_text}" \
   --payload-raw-field "stdout" "${stdout_text}" \
   --payload-raw-field "stderr" "${stderr_text}" \
-  --payload-raw-field-json "status_line" "${status_line_json}" \
-  --payload-raw-field-json "http_status" "${http_status_json}" \
+  "${status_line_field[@]}" \
+  "${http_status_field[@]}" \
   --payload-raw-field "target_url" "${target_url}" \
   --payload-raw-field "method" "${method}" \
-  --payload-raw-field-json "network_disabled_env" "${network_disabled_json}" \
+  "${network_disabled_field[@]}" \
   --operation-arg "url" "${target_url}" \
   --operation-arg "method" "${method}" \
   --operation-arg-json "connect_timeout" "${connect_timeout_json}" \

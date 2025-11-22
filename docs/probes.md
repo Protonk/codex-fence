@@ -28,9 +28,9 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
   remains for automation).
 - **Helpers:** Prefer the compiled helpers in `bin/` over ad-hoc logic.
   Path canonicalization routes through `bin/portable-path`; JSON extraction
-  (when you must parse another program’s JSON) goes through `bin/json-extract`
-  instead of jq/Python. Build payloads/operation args with `emit-record`
-  flags (`--payload-stdout/-stderr`, `--payload-raw-field[-json|-list|-null]`,
+  (when you must parse another program’s JSON) goes through `bin/json-extract`.
+  Build payloads/operation args with `emit-record` flags
+  (`--payload-stdout/-stderr`, `--payload-raw-field[-json|-list|-null]`,
   `--operation-arg[-json|-list|-null]`) rather than constructing JSON manually.
 
 ## How the harness runs a probe
@@ -93,8 +93,7 @@ coerce bad output into a result.
 - **Workspace awareness:** Stay inside the workspace unless the probe’s sole
   purpose is to cross that boundary, and record the target you touched.
 - **Deterministic JSON:** Let `emit-record` and the Rust helpers handle JSON
-  serialization; avoid jq in probes and prefer `json-extract` for parsing
-  third-party JSON. Do not branch on interpreter availability—fail loudly if a
+  serialization. Do not branch on interpreter availability—fail loudly if a
   required tool is missing.
 
 ## Testing probes

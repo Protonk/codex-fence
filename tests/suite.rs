@@ -473,7 +473,7 @@ primary_capability_id="cap_fs_read_workspace_tree"
 }
 
 // Exercises the dynamic probe contract gate to ensure the stub parser stays in
-// sync with emit-record flag usage for jq-free probes.
+// sync with emit-record flag usage.
 #[test]
 fn dynamic_probe_contract_accepts_fixture() -> Result<()> {
     let repo_root = repo_root();

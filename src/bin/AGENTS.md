@@ -84,8 +84,8 @@ update these helpers together.
   - Ensure outputs remain deterministic across macOS and Linux.
 
 ### `json-extract`
-- **Purpose:** Minimal JSON pointer extractor to replace `jq` in probes when
-  they need to read structured fields from helper output.
+- **Purpose:** Minimal JSON pointer extractor for probes that need to read
+  structured fields from helper output.
 - **Expectations:**
   - Keep the CLI small and predictable (`--file/--stdin`, `--pointer`, `--type`,
     `--default`), returning compact JSON on stdout and actionable errors on
@@ -106,5 +106,4 @@ update these helpers together.
 - Keep new policies reflected in docs/tests (README, `docs/*.md`, harness
   scripts) so shell callers stay in sync with the Rust behavior.
 - Maintain portability: everything must run on macOS `/bin/bash 3.2` and inside
-  the `codex-universal` container with only the shipped Rust binaries
-  (jq is only required for the shell-based contract gate).
+  the `codex-universal` container with only the shipped Rust binaries.

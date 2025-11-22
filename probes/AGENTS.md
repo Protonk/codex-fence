@@ -23,7 +23,7 @@ Keep each probe:
   relpath, `bin/json-extract` when you must parse JSON). Build payloads and
   operation args with `bin/emit-record` flags (`--payload-stdout/-stderr`,
   `--payload-raw-field[-json|-list|-null]`, `--operation-arg[...]`) instead of
-  constructing JSON via jq.
+  constructing JSON manually.
 - Clearly labeled with `primary_capability_id`. Choose the best match from the
   catalog and optionally list related capabilities in
   `secondary_capability_ids`. `bin/emit-record` enforces these IDs.
@@ -31,14 +31,14 @@ Keep each probe:
 Never:
 - Print anything besides the JSON boundary object to stdout. Use stderr for
   debugging only when necessary.
-- Depend on jq or branch behavior based on interpreter availability. If a
+- Branch behavior based on interpreter availability. If a
   required tool is missing, fail explicitly.
 
 ## Probe layout
 
 All probes live directly under the `probes/` directory with filenames that match
 their `probe.id` (for example, `probes/fs_outside_workspace.sh`). This flat
-layout eliminates role- and category-specific subdirectories—every script is
+layout explicitly decides against role- and category-specific subdirectories—every script is
 just a probe. Keep capability metadata accurate so downstream tooling can reason
 about coverage without depending on directory names.
 

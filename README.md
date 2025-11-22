@@ -51,8 +51,7 @@ probe author walkthrough.
   stdin; stdout is only the JSON record.
 - Use helpers, not bespoke parsing: payloads/args built with `emit-record`
   flags (`--payload-stdout/-stderr`, `--payload-raw-field[-json|-list|-null]`,
-  `--operation-arg[...]`). Parse JSON with `bin/json-extract` if you must; jq is
-  not a runtime dependency.
+  `--operation-arg[...]`). Parse JSON with `bin/json-extract` if you must.
 - Declare capabilities accurately (`--primary-capability-id`), record the exact
   command you ran, and normalize status to `success|denied|partial|error` with
   sensible errno/message. If a required tool is missing, fail explicitly.

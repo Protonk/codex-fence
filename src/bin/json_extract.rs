@@ -1,9 +1,9 @@
-//! Minimal JSON pointer extractor to replace jq in probes.
+//! Minimal JSON pointer extractor for probes.
 //!
 //! Reads JSON from a file or stdin, optionally walks a JSON Pointer, enforces an
 //! expected type, and prints the selected value as compact JSON. Designed for
 //! probes that need to pull booleans/numbers/objects out of helper output
-//! without depending on jq or ad-hoc Python parsing.
+//! without adding scripting dependencies.
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
