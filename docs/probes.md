@@ -58,8 +58,8 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
      probe runs with no Codex-applied Seatbelt profile. (Requires the Codex CLI
      in `PATH`.)
 3. **Result capture** – the probe prints one JSON boundary object to stdout.
-   `make matrix` stores each run as `out/<probe>.<mode>.json` so you can diff
-   runs across modes, CLI versions, or host machines.
+  `codex-fence --bang` streams every record as NDJSON so you can capture and
+  diff runs across modes, CLI versions, or host machines.
 
 ## What a probe emits
 

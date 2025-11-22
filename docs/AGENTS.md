@@ -4,7 +4,7 @@ This directory contains human-readable explanations of the *contracts* that `cod
 
 - the capability catalog (`capabilities.json`)
 - probe scripts (`probes/*.sh`)
-- probe outputs (boundary objects under `out/*.json`)
+- probe outputs (boundary objects streamed from `codex-fence --bang`)
 
 The actual contracts are enforced by schemas, adapters, and tests. The documents in `docs/` must never become the primary source of truth about behavior or policy.
 
@@ -83,7 +83,7 @@ The machine-readable contract is `schema/boundary_object.json`, enforced by `bin
 
 **Read this if**
 
-- You are interpreting probe output under `out/*.json`.
+- You are interpreting streamed boundary objects (e.g., from `codex-fence --bang`).
 - You are modifying `bin/emit-record` or any adapters that build boundary objects.
 - You are adding new consumers of boundary objects and need to know which fields are stable.
 

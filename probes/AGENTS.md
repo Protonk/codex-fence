@@ -63,7 +63,7 @@ A probe:
    built inline). Pass `--run-mode "$FENCE_RUN_MODE"` (exported by
    `bin/fence-run`) so the emitted record matches the current mode.
 5. Exits with status `0` after emitting JSON. `bin/fence-run` relies on this
-   behavior to stream records to disk via `make matrix`.
+  behavior so `codex-fence --bang` can stream records as NDJSON.
 
 ### How a probe should emit JSON
 

@@ -8,8 +8,8 @@ writes every observation down as JSON. It never talks to models; it just asks
 ## TL;DR
 
 - Build the helper binaries: `make build-bin`
-- Run everything: `make matrix` (or `codex-fence --bang`)
-- Read what happened: `codex-fence --listen < out/*.json`
+- Run everything: `codex-fence --bang`
+- Read what happened: `codex-fence --bang | codex-fence --listen`
 
 Probes are single Bash scripts under `probes/`, one action each, emitting one
 cfbo-v1 boundary object via the Rust `emit-record` serializer. The helpers live
@@ -38,8 +38,8 @@ Everything in the repo exists to turn a capability into an auditable signal:
 4. **Serialization**: `emit-record` validates capability IDs, pulls stack info
    from `detect-stack`, and serializes a cfbo-v1 record. Everything is strict:
    bad flags are fatal, capability IDs must exist in the catalog. [docs/boundary_object.md](docs/boundary_object.md) contains field-by-field detail.
-5. **Signals**: Runs land in `out/<probe>.<mode>.json`. Diff across modes,
-   commits, or hosts to see policy changes.
+5. **Signals**: `codex-fence --bang` streams cfbo-v1 JSON per probe/mode.
+  Capture the NDJSON anywhere you like to diff across modes, commits, or hosts.
 
 ### Probes
 
@@ -76,10 +76,8 @@ make install PREFIX=~/.local   # optional: install codex-fence/fence-*
 ## Common workflows
 
 - Run a single probe: `bin/fence-run baseline fs_outside_workspace`
-- Sweep modes: `make matrix` (or `make matrix MODES="baseline codex-sandbox"`)
+- Sweep modes: `codex-fence --bang` (override `MODES="baseline codex-sandbox"` to limit modes)
 - Stream + listen: `codex-fence --bang | codex-fence --listen`
-
-Outputs land in `out/` for diffing.
 
 ## Tests & guard rails
 
@@ -103,7 +101,6 @@ Probe Authors have access to an interpreted probe contract validator for use in 
 | `docs/` | Human-readable explainers (capabilities, probes, boundary objects). |
 | `tools/` | Authoring helpers (contract gate, adapters, path resolvers). |
 | `tests/` | Static contract + Rust guard rails. |
-| `out/` | Probe outputs (`<probe>.<mode>.json`). |
 | `tmp/` | Scratch space. |
 | `Makefile` | Convenience targets tying the harness together. |
 
