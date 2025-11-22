@@ -50,7 +50,7 @@ Populated automatically by `bin/detect-stack`.
 
 ### `probe`
 
-Probe identity stays explicit and tied to the capability catalog.
+`bin/emit-record` validates capability IDs by loading `schema/capabilities.json` directly (the legacy adapter remains for automation).
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -59,11 +59,11 @@ Probe identity stays explicit and tied to the capability catalog.
 | `primary_capability_id` | yes | Capability tested by this probe. Must match the capability catalog. |
 | `secondary_capability_ids` | yes | Zero or more supporting capability ids (unique, may be empty). |
 
-`bin/emit-record` validates capability IDs by loading `schema/capabilities.json` directly (the legacy adapter remains for automation). Add or update IDs in the catalog first.
+
 
 ### `run`
 
-Execution context specific to the current invocation.
+cfbo-v1 deliberately does **not** capture timestamps or run durations. The harness stays stateless; downstream consumers that need clocks or diffing data must add it outside the boundary object.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -71,7 +71,6 @@ Execution context specific to the current invocation.
 | `workspace_root` | yes (nullable) | Canonical workspace root exported by `bin/fence-run` (`FENCE_WORKSPACE_ROOT`), falling back to `git rev-parse` / `pwd` if unset. |
 | `command` | yes | Human/machine-usable string describing the actual command. |
 
-cfbo-v1 deliberately does **not** capture timestamps or run durations. The harness stays stateless; downstream consumers that need clocks or diffing data must add it outside the boundary object.
 
 ### `operation`
 
@@ -94,7 +93,6 @@ Normalized observation of what happened, regardless of how the probe implemented
 | `raw_exit_code` | yes (nullable) | Exit code from the command that performed the operation. |
 | `errno` | yes (nullable) | Errno mnemonic (`EACCES`, `EPERM`, ...) if inferred. |
 | `message` | yes (nullable) | Short human summary of the outcome. |
-| `duration_ms` | yes (nullable) | Wall-clock time spent on the operation if measured. |
 | `error_detail` | yes (nullable) | Additional diagnostics for unexpected failures. |
 
 Interpretation of `observed_result`:
@@ -103,6 +101,8 @@ Interpretation of `observed_result`:
 - `denied`: explicitly blocked by sandbox/policy (permission denied, EPERM, etc.).
 - `partial`: some sub-step succeeded while another failed; note details in `message` / `payload.raw`.
 - `error`: probe failed for reasons unrelated to sandbox policy (implementation bug, transient infra error).
+
+cfbo-v1 does not carry runtime durations. The probe contract stays clock-free; any per-probe timings shown by development tooling are diagnostics for authors and do not reach the boundary object.
 
 ### `payload`
 
@@ -153,7 +153,6 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
     "raw_exit_code": 1,
     "errno": "EACCES",
     "message": "Permission denied",
-    "duration_ms": null,
     "error_detail": null
   },
   "payload": {

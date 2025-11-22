@@ -133,7 +133,6 @@ Matching JSON output (trimmed for brevity):
     "raw_exit_code": 1,
     "errno": "EACCES",
     "message": "Permission denied",
-    "duration_ms": null,
     "error_detail": null
   },
   "operation": {

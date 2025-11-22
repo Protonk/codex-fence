@@ -128,11 +128,14 @@ fn boundary_object_schema() -> Result<()> {
         "raw_exit_code",
         "errno",
         "message",
-        "duration_ms",
         "error_detail",
     ] {
         assert!(result_obj.get(key).is_some(), "result missing {key}");
     }
+    assert!(
+        result_obj.get("duration_ms").is_none(),
+        "result should not include duration_ms"
+    );
 
     assert_eq!(
         value

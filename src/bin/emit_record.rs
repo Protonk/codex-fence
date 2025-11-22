@@ -69,7 +69,6 @@ fn run() -> Result<()> {
         "raw_exit_code": args.raw_exit_code,
         "errno": args.errno,
         "message": args.message,
-        "duration_ms": args.duration_ms,
         "error_detail": args.error_detail,
     });
 
@@ -136,7 +135,6 @@ struct CliArgs {
     status: String,
     errno: Option<String>,
     message: Option<String>,
-    duration_ms: Option<i64>,
     raw_exit_code: Option<i64>,
     error_detail: Option<String>,
     payload: PayloadArgs,
@@ -167,12 +165,6 @@ impl CliArgs {
                 "--status" => config.status = Some(next_value(&mut args, "--status")?),
                 "--errno" => config.errno = Some(next_value(&mut args, "--errno")?),
                 "--message" => config.message = Some(next_value(&mut args, "--message")?),
-                "--duration-ms" => {
-                    config.duration_ms = Some(parse_i64(
-                        next_value(&mut args, "--duration-ms")?,
-                        "duration-ms",
-                    )?)
-                }
                 "--raw-exit-code" => {
                     config.raw_exit_code = Some(parse_i64(
                         next_value(&mut args, "--raw-exit-code")?,
@@ -307,7 +299,6 @@ struct PartialArgs {
     status: Option<String>,
     errno: Option<String>,
     message: Option<String>,
-    duration_ms: Option<i64>,
     raw_exit_code: Option<i64>,
     error_detail: Option<String>,
     payload: PayloadArgs,
@@ -329,7 +320,6 @@ impl PartialArgs {
             status,
             errno,
             message,
-            duration_ms,
             raw_exit_code,
             error_detail,
             payload,
@@ -349,7 +339,6 @@ impl PartialArgs {
             status: Self::require("--status", status)?,
             errno: errno.filter(not_empty),
             message: message.filter(not_empty),
-            duration_ms,
             raw_exit_code,
             error_detail: error_detail.filter(not_empty),
             payload,
@@ -738,7 +727,7 @@ fn print_usage() {
 fn usage() -> &'static str {
     "Usage: emit-record --run-mode MODE --probe-name NAME --probe-version VERSION \
   --primary-capability-id CAP_ID --command COMMAND \
-  --category CATEGORY --verb VERB --target TARGET --status STATUS [options]\n\nOptions:\n  --errno ERRNO\n  --message MESSAGE\n  --duration-ms MILLIS\n  --raw-exit-code CODE\n  --error-detail TEXT\n  --secondary-capability-id CAP_ID   # repeat for multiple entries\n  --payload-file PATH (JSON object)\n  --payload-stdout TEXT | --payload-stdout-file PATH\n  --payload-stderr TEXT | --payload-stderr-file PATH\n  --payload-raw JSON_OBJECT | --payload-raw-file PATH\n  --payload-raw-field KEY VALUE\n  --payload-raw-field-json KEY JSON_VALUE\n  --payload-raw-null KEY\n  --payload-raw-list KEY \"a,b,c\"\n  --operation-args JSON_OBJECT | --operation-args-file PATH\n  --operation-arg KEY VALUE\n  --operation-arg-json KEY JSON_VALUE\n  --operation-arg-null KEY\n  --operation-arg-list KEY \"a,b,c\"\n"
+  --category CATEGORY --verb VERB --target TARGET --status STATUS [options]\n\nOptions:\n  --errno ERRNO\n  --message MESSAGE\n  --raw-exit-code CODE\n  --error-detail TEXT\n  --secondary-capability-id CAP_ID   # repeat for multiple entries\n  --payload-file PATH (JSON object)\n  --payload-stdout TEXT | --payload-stdout-file PATH\n  --payload-stderr TEXT | --payload-stderr-file PATH\n  --payload-raw JSON_OBJECT | --payload-raw-file PATH\n  --payload-raw-field KEY VALUE\n  --payload-raw-field-json KEY JSON_VALUE\n  --payload-raw-null KEY\n  --payload-raw-list KEY \"a,b,c\"\n  --operation-args JSON_OBJECT | --operation-args-file PATH\n  --operation-arg KEY VALUE\n  --operation-arg-json KEY JSON_VALUE\n  --operation-arg-null KEY\n  --operation-arg-list KEY \"a,b,c\"\n"
 }
 
 fn not_empty(value: &String) -> bool {

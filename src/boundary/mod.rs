@@ -91,8 +91,6 @@ pub struct ResultInfo {
     #[serde(default)]
     pub message: Option<String>,
     #[serde(default)]
-    pub duration_ms: Option<i64>,
-    #[serde(default)]
     pub error_detail: Option<String>,
 }
 
@@ -230,7 +228,6 @@ mod tests {
                 raw_exit_code: Some(0),
                 errno: None,
                 message: None,
-                duration_ms: Some(10),
                 error_detail: None,
             },
             payload: Payload {
