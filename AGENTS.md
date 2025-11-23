@@ -5,32 +5,29 @@ If you are reading this, you have already seen `README.md` and `CONTRIBUTING.md`
 ## How to use this file
 
 Treat this document as a router. Once you know which part of the tree you are touching, defer to the `AGENTS.md` in that directory and obey its contract. 
-
 * `probes/AGENTS.md` — Probe Author contract: one observable action per script, cfbo-v1 emission rules, capability selection, and how to use helpers like `emit-record`, `portable-path`, and `json-extract`.
 * `tests/AGENTS.md` — Test harness contract: how `cargo test` is wired, where fixtures live, and how guard rails map to specific contracts (schema, catalog, CLI, workspace). 
 * `src/AGENTS.md` — Structure and expectations for Rust code under `src/`, excluding the helper CLIs.
-* `src/bin/AGENTS.md` — Guarantees for the Rust helper binaries (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, etc.); how their CLIs and stack metadata must remain stable over time. 
+  * `src/bin/AGENTS.md` — Guarantees for the Rust helper binaries (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, etc.); how their CLIs and stack metadata must remain stable over time. 
 * `tools/AGENTS.md` — Contracts for helper scripts under `tools/` and how they fit into supported workflows.
 * `docs/AGENTS.md` — How explanatory docs relate to machine contracts; when you add or change an explainer in `docs/`, this is the place that says how it should track the schemas and tests. 
 
 If you are unsure where a change belongs, pick the directory that contains the files you are editing and start with its `AGENTS.md`.
 
-## Shared expectations for all agents
+## Good habits for all agents
 
-Several expectations apply no matter which subsystem you touch. These are the habits that let aggressive automation and human contributors coexist safely.
-
-* Use the supported workflows. For probes, iterate with `tools/validate_contract_gate.sh --probe <id>` or `make probe PROBE=<id>` to get a fast, local contract gate before running the full suite. For repository-wide checks, use `cargo test` (or `cargo test --test suite`) as the single entry point for Rust guard rails, including schema validation and contract enforcement. 
+These habits let aggressive automation and human contributors coexist safely:
+* Use the supported workflows. For probes, iterate with `tools/validate_contract_gate.sh --probe <id>` or `make probe PROBE=<id>` to get a fast, local contract gate before running the full suite. 
 * Treat `bin/codex-fence` as the top-level CLI for `--bang`, `--rattle`, `--listen`, and `--test`. It delegates to Rust helpers; keep its behavior aligned with the Makefile defaults and existing harness scripts rather than re-implementing probe logic in new places. 
-* Preserve the portability stance described in `README.md` and `CONTRIBUTING.md`: scripts must run under macOS `/bin/bash 3.2` and inside the `codex-universal` container, using the Rust helpers shipped in `bin/`. When you change helper CLIs under `src/bin/`, rebuild them into `bin/` via `make build-bin` so Probes, tests, and tools see a consistent runtime. 
-* Do not introduce new runtime dependencies beyond Bash and the existing Rust binaries. If you need new behavior, either express it in Bash or extend the Rust helpers and rebuild; do not add another interpreter or service to the runtime data path. 
-* Canonicalize paths before you enforce workspace or probe boundaries. Use `bin/portable-path realpath|relpath` instead of ad-hoc `realpath`, `readlink`, or string slicing; the helpers exist to keep path handling portable and auditable. 
-* Keep new policy in machine artifacts—schemas, probes, tests, tools. Documentation and AGENTS files explain those artifacts; they do not replace them. If you change a contract, there should be a schema and/or test that encodes it, and the relevant `*/AGENTS.md` should point to that enforcement. 
+* Preserve portability: scripts must run identically under macOS `/bin/bash 3.2` and inside the `codex-universal` container, using the Rust helpers shipped in `bin/`. Do not introduce new runtime dependencies beyond Bash and the existing Rust binaries. If you need new behavior, either express it in Bash or extend the Rust helpers and rebuild; do not add another interpreter or service to the runtime data path.  
+* Keep new policy in machine artifacts—schemas, probes, tests, tools. Documentation and AGENTS files explain those artifacts; they do not replace them. If you change a contract, there should be a schema and/or test that encodes it, and the relevant `*/AGENTS.md` should point to that enforcement.
+* Use `cargo test` (or `cargo test --test suite`) as the single entry point for Rust guard rails, including schema validation and contract enforcement. All existing tests must pass to land a new contribution.
 
-If you follow these rules—use the standard loops, stay within the dependency and portability boundaries, and encode policy in code + schemas + tests—you can make large changes with confidence. The guard rails are designed to reject inconsistent work, not to block you from trying.
+If you follow these rules—use the standard loops, stay within the dependency and portability boundaries, and encode policy in code + schemas + tests—you can make large changes with confidence.
 
 ## Repository layout snapshot
 
-For quick orientation, this is how the tree is organized. Use it to decide which `AGENTS.md` to read next and to understand where your change sits in the larger system. 
+For quick orientation, this is how the tree is organized.
 
 | Path      | Purpose / Notes                                                                                                                                         |   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | - |
