@@ -82,12 +82,15 @@ make install PREFIX=~/.local   # optional: install codex-fence globally
 
 ## Repo map
 
-Think of the project tree in four vertical slices, each with a single job:
-
-- **Probes & contracts**: `probes/` contains the one-action Bash probes plus the author contract (`probes/AGENTS.md`). These scripts are the only things that ever touch the sandbox directly.
-- **Runtime helpers**: `src/bin/` houses the Rust CLIs (`codex-fence`, `fence-run`, `emit-record`, `detect-stack`, `portable-path`, `json-extract`, `fence-bang/listen/test`). Their compiled artifacts live in `bin/` after `make build-bin` and are what probes call on disk.
-- **Policy & explanation**: `schema/` is the machine contract (capability catalog + cfbo schema). `docs/` and the root `AGENTS.md` explain how to interpret that contract, keeping humans aligned with the JSON boundaries.
-- **Validation tooling**: `tools/` scripts wire up author workflows (contract gate, adapters, path resolvers), while `tests/` contains the Rust guard rails that enforce the same rules under `cargo test`. `tmp/` is an expendable scratchpad for runs, and the `Makefile` ties everything together with portable targets.
+| Directory | What lives here |
+| --- | --- |
+| `probes/` | One-action Bash probes plus `probes/AGENTS.md`, the only code that directly exercises the sandbox. |
+| `bin/` | Prebuilt helper binaries (`codex-fence`, `fence-run`, `emit-record`, `portable-path`, etc.) synced from `src/bin/` via `make build-bin`. |
+| `src/` | Rust sources for every helper CLI and library, including the implementations that feed the binaries under `bin/`. |
+| `schema/` | Machine-readable capability catalog and cfbo schema that define the contract probes must honor. |
+| `docs/` | Human-readable explanations (`docs/*.md`, root `AGENTS.md`) that interpret the schema, probes, and runtime expectations. |
+| `tests/` | Guard-rail code (Rust + fixtures) that enforces the same contracts under `cargo test` and during CI. |
+| `tools/` | Author tooling: shell helpers for contract gates, adapters, and other workflows that support probe development. |
 
 ## Attitude
 
