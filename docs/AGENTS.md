@@ -10,8 +10,6 @@ The actual contracts are enforced by schemas, adapters, and tests. The documents
 
 Use this file before you read or edit anything in `docs/`.
 
----
-
 ## What to know before reading these docs
 
 1. Start with the project root `README.md` if you need the big picture: why `codex-fence` exists, what a “probe” is, and how the harness runs.
@@ -44,8 +42,6 @@ Explains the structure and intent of `capabilities.json`:
 - You are adding or interpreting entries in `capabilities.json`.
 - You are writing probes and need to see how they’re expected to align with capabilities.
 
----
-
 ### `probes.md`
 
 **Role**
@@ -65,8 +61,6 @@ The authoritative probe-author contract lives in `probes/AGENTS.md` and the test
 - You are new to the project and want a narrative overview of probes.
 - You are about to write your first probe and need a conceptual checklist.
 - You are a model-based agent being asked to reason about how probes behave, but not to edit them directly.
-
----
 
 ### `boundary_object.md`
 
@@ -98,8 +92,6 @@ The machine-readable contract is `schema/boundary_object.json`, enforced by `bin
   - the adapter scripts,
   - and the tests that validate stored boundary objects.
 - Treat examples as illustrative only; the schema must stay ahead of the prose.
-
----
 
 ## Adding or changing docs in `docs/`
 
