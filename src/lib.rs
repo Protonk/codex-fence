@@ -1,7 +1,7 @@
 //! Shared library for the codex-fence harness.
 //!
-//! This crate is intentionally small and repetitive to make visible 
-//! how the layers stack. Each public function exists because a binary 
+//! This crate is intentionally small and repetitive to make visible
+//! how the layers stack. Each public function exists because a binary
 //! depends on it; treat them as contracts and
 //! keep behavior aligned with the narrative in README.md and docs/*.md.
 

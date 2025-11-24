@@ -530,6 +530,40 @@ fn fence_rattle_runs_capability_subset() -> Result<()> {
     Ok(())
 }
 
+// Smoke test for the compiled helper-backed probe.
+#[test]
+fn proc_paging_stress_probe_emits_expected_record() -> Result<()> {
+    let repo_root = repo_root();
+    let _guard = repo_guard();
+    let fence_run = helper_binary(&repo_root, "fence-run");
+
+    let mut cmd = Command::new(&fence_run);
+    cmd.arg("baseline")
+        .arg("proc_paging_stress")
+        .env("CODEX_FENCE_PREFER_TARGET", "1");
+    let output = run_command(cmd)?;
+    let (record, value) = parse_boundary_object(&output.stdout)?;
+    assert_eq!(record.probe.id, "proc_paging_stress");
+    assert_eq!(
+        record.probe.primary_capability_id.0,
+        "cap_proc_fork_and_child_spawn"
+    );
+    assert_eq!(record.result.observed_result, "success");
+    assert_eq!(
+        value
+            .pointer("/payload/raw/helper_timeout")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        value
+            .pointer("/operation/args/pattern")
+            .and_then(Value::as_str),
+        Some("random")
+    );
+    Ok(())
+}
+
 // Dry-run listing should summarize the plan without emitting JSON.
 #[test]
 fn fence_rattle_list_only_reports_plan() -> Result<()> {
@@ -944,6 +978,46 @@ fn resolve_helper_falls_back_to_bin() -> Result<()> {
     make_executable(&helper)?;
     let resolved = resolve_helper_binary(&temp.root, "emit-record")?;
     assert_eq!(resolved, helper);
+    Ok(())
+}
+
+#[test]
+fn paging_stress_runs_small_workload() -> Result<()> {
+    let repo_root = repo_root();
+    let helper = helper_binary(&repo_root, "paging-stress");
+    let mut cmd = Command::new(&helper);
+    cmd.args([
+        "--megabytes",
+        "1",
+        "--passes",
+        "1",
+        "--pattern",
+        "sequential",
+        "--max-seconds",
+        "2",
+    ])
+    .env("CODEX_FENCE_PREFER_TARGET", "1");
+    let output = run_command(cmd)?;
+    assert!(
+        output.stdout.is_empty(),
+        "paging-stress should keep stdout empty"
+    );
+    Ok(())
+}
+
+#[test]
+fn paging_stress_rejects_invalid_arguments() -> Result<()> {
+    let repo_root = repo_root();
+    let helper = helper_binary(&repo_root, "paging-stress");
+
+    let mut cmd = Command::new(&helper);
+    cmd.args(["--megabytes", "0"])
+        .env("CODEX_FENCE_PREFER_TARGET", "1");
+    let output = cmd
+        .output()
+        .context("failed to execute paging-stress with invalid args")?;
+    assert!(!output.status.success(), "invalid argument run should fail");
+    assert_eq!(output.status.code(), Some(1));
     Ok(())
 }
 
@@ -1906,6 +1980,12 @@ fn sanitized_path_without_codex() -> Result<OsString> {
             }
         }
         entries.push(entry);
+    }
+    // Keep a minimal search path so /usr/bin/env can resolve bash even when the
+    // host PATH only contained codex.
+    if entries.is_empty() {
+        entries.push(PathBuf::from("/usr/bin"));
+        entries.push(PathBuf::from("/bin"));
     }
     Ok(env::join_paths(entries)?)
 }

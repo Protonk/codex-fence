@@ -21,6 +21,7 @@ CARGO_BINARIES=(
   fence-test
   portable-path
   json-extract
+  paging-stress
 )
 
 CARGO=${CARGO:-cargo}

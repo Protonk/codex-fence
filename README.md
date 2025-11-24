@@ -37,6 +37,10 @@ The Probe Author contract is defined in detail at [probes/AGENTS.md](probes/AGEN
 4. Prints that JSON record to stdout and exits with status 0 so the harness can treat the probe as “observed” even when the underlying operation is denied.
 
 Probe Authors do not need to know Rust internals, sandbox profile syntax, or Codex implementation details. They just need to satisfy their contract and let the surrounding infrastructure keep everything coherent.
+When a probe needs low-level or performance-sensitive behavior, it may shell
+out to a small compiled helper under `probe-runtime/` (synced into `bin/` by
+`make build-bin`). Helpers stay quiet on stdout and return stable exit codes;
+the probe remains the orchestrator and still emits the single boundary object.
 
 ### Boundary objects (cfbo-v1)
 

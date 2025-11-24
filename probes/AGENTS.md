@@ -42,6 +42,17 @@ layout explicitly decides against role- and category-specific subdirectories—e
 just a probe. Keep capability metadata accurate so downstream tooling can reason
 about coverage without depending on directory names.
 
+## Using compiled helpers from probes
+
+Probes may delegate narrowly scoped work to compiled helpers under
+`probe-runtime/` (synced into `bin/` by `make build-bin`). Keep the probe as the
+orchestrator: pass explicit arguments, enforce a timeout, and still emit the
+single JSON record via `bin/emit-record`. Helpers must stay quiet on stdout,
+run in the foreground, and use stable, documented exit codes (0 success, 1
+invalid args, 2 internal error, 3 timeout). Keep helper CLIs small and
+capability-aligned so their behavior is easy to reason about from the probe and
+its README.
+
 ## Probe description and agent guidance (cfbo-v1)
 
 A probe:
