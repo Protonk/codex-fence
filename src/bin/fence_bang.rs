@@ -6,13 +6,14 @@
 //! emitted JSON object on its own line.
 
 use anyhow::{Context, Result, bail};
+use codex_fence::connectors::{
+    Availability, RunMode, allowed_mode_names, default_mode_names, parse_modes,
+};
 use codex_fence::{
-    Probe, codex_present, find_repo_root, list_probes, resolve_helper_binary, resolve_probe,
-    split_list,
+    Probe, find_repo_root, list_probes, resolve_helper_binary, resolve_probe, split_list,
 };
 use serde_json::Value;
 use std::{
-    collections::BTreeSet,
     env,
     path::Path,
     process::{Command, Stdio},
@@ -33,8 +34,12 @@ fn run() -> Result<()> {
     let mut errors: Vec<String> = Vec::new();
     for mode in modes {
         for probe in &probes {
-            if let Err(err) = run_probe(&repo_root, probe, &mode) {
-                let message = format!("probe {} in mode {} failed: {err:#}", probe.id, mode);
+            if let Err(err) = run_probe(&repo_root, probe, mode) {
+                let message = format!(
+                    "probe {} in mode {} failed: {err:#}",
+                    probe.id,
+                    mode.as_str()
+                );
                 eprintln!("fence-bang: {message}");
                 errors.push(message);
             }
@@ -52,8 +57,8 @@ fn run() -> Result<()> {
     }
 }
 
-fn resolve_modes() -> Result<Vec<String>> {
-    let modes = env::var("MODES")
+fn resolve_modes() -> Result<Vec<RunMode>> {
+    let requested = env::var("MODES")
         .ok()
         .and_then(|raw| {
             let parsed = split_list(&raw);
@@ -63,30 +68,21 @@ fn resolve_modes() -> Result<Vec<String>> {
                 Some(parsed)
             }
         })
-        .unwrap_or_else(|| {
-            if codex_present() {
-                vec![
-                    "baseline".to_string(),
-                    "codex-sandbox".to_string(),
-                    "codex-full".to_string(),
-                ]
-            } else {
-                vec!["baseline".to_string()]
-            }
-        });
+        .unwrap_or_else(|| default_mode_names(Availability::for_host()));
 
-    let allowed: BTreeSet<&'static str> = ["baseline", "codex-sandbox", "codex-full"]
-        .into_iter()
-        .collect();
-    if let Some(bad) = modes.iter().find(|mode| !allowed.contains(mode.as_str())) {
-        bail!("Unsupported mode requested: {bad}");
-    }
-
-    if modes.is_empty() {
+    if requested.is_empty() {
         bail!("No modes resolved; check MODES env var");
     }
 
-    Ok(modes)
+    let allowed = allowed_mode_names();
+    if let Some(bad) = requested
+        .iter()
+        .find(|mode| !allowed.contains(&mode.as_str()))
+    {
+        bail!("Unsupported mode requested: {bad}");
+    }
+
+    parse_modes(&requested)
 }
 
 fn resolve_probes(repo_root: &Path) -> Result<Vec<Probe>> {
@@ -107,10 +103,10 @@ fn resolve_probes(repo_root: &Path) -> Result<Vec<Probe>> {
     Ok(probes)
 }
 
-fn run_probe(repo_root: &Path, probe: &Probe, mode: &str) -> Result<()> {
+fn run_probe(repo_root: &Path, probe: &Probe, mode: RunMode) -> Result<()> {
     let runner = resolve_helper_binary(repo_root, "fence-run")?;
     let output = Command::new(&runner)
-        .arg(mode)
+        .arg(mode.as_str())
         .arg(&probe.path)
         .current_dir(repo_root)
         .stdout(Stdio::piped())
@@ -120,12 +116,13 @@ fn run_probe(repo_root: &Path, probe: &Probe, mode: &str) -> Result<()> {
 
     if !output.status.success() {
         // Gracefully skip codex modes when the host blocks sandbox application.
-        if mode.starts_with("codex")
+        if mode.is_codex()
             && (output.status.code() == Some(71)
                 || String::from_utf8_lossy(&output.stderr).contains("sandbox_apply"))
         {
             eprintln!(
-                "fence-bang: skipping mode {mode} for probe {}: codex sandbox unavailable",
+                "fence-bang: skipping mode {} for probe {}: codex sandbox unavailable",
+                mode.as_str(),
                 probe.id
             );
             return Ok(());
@@ -134,14 +131,15 @@ fn run_probe(repo_root: &Path, probe: &Probe, mode: &str) -> Result<()> {
         bail!(
             "Probe {} in mode {} returned non-zero exit code {code}",
             probe.id,
-            mode
+            mode.as_str()
         );
     }
 
     let json_value: Value = serde_json::from_slice(&output.stdout).with_context(|| {
         format!(
             "Failed to parse boundary object for probe {} in mode {}",
-            probe.id, mode
+            probe.id,
+            mode.as_str()
         )
     })?;
     let compact = serde_json::to_string(&json_value)?;

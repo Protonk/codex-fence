@@ -15,6 +15,7 @@ use std::{
 
 pub mod boundary;
 pub mod catalog;
+pub mod connectors;
 pub mod coverage;
 pub mod emit_support;
 pub mod fence_run_support;

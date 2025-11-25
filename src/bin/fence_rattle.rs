@@ -5,9 +5,12 @@
 //! existing execution pipeline (fence-run → emit-record) remains untouched.
 
 use anyhow::{Context, Result, anyhow, bail};
+use codex_fence::connectors::{
+    Availability, RunMode, allowed_mode_names, default_mode_names, parse_modes,
+};
 use codex_fence::{
-    CapabilityId, CapabilityIndex, Probe, ProbeMetadata, codex_present, find_repo_root,
-    list_probes, resolve_helper_binary, resolve_probe,
+    CapabilityId, CapabilityIndex, Probe, ProbeMetadata, find_repo_root, list_probes,
+    resolve_helper_binary, resolve_probe,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -35,13 +38,18 @@ fn run() -> Result<()> {
     run_matrix(&repo_root, &plan.probes, &modes, cli.repeat)
 }
 
-fn print_dry_run(plan: &SelectionPlan, modes: &[String], repeat: u32) {
+fn print_dry_run(plan: &SelectionPlan, modes: &[RunMode], repeat: u32) {
     println!("codex-fence rattle (dry-run)");
     match &plan.selection {
         SelectionDescription::Capability(id) => println!("capability: {}", id.0),
         SelectionDescription::Probes(ids) => println!("probes: {}", ids.join(", ")),
     }
-    println!("modes: {}", modes.join(", "));
+    let mode_names = modes
+        .iter()
+        .map(|mode| mode.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    println!("modes: {mode_names}");
     if repeat > 1 {
         println!("repeat: {repeat}");
     }
@@ -51,7 +59,7 @@ fn print_dry_run(plan: &SelectionPlan, modes: &[String], repeat: u32) {
     }
 }
 
-fn run_matrix(repo_root: &Path, probes: &[Probe], modes: &[String], repeat: u32) -> Result<()> {
+fn run_matrix(repo_root: &Path, probes: &[Probe], modes: &[RunMode], repeat: u32) -> Result<()> {
     if probes.is_empty() {
         bail!("no probes resolved for rattle run");
     }
@@ -61,7 +69,11 @@ fn run_matrix(repo_root: &Path, probes: &[Probe], modes: &[String], repeat: u32)
         .map(|probe| probe.id.as_str())
         .collect::<Vec<_>>()
         .join(",");
-    let modes_arg = modes.join(" ");
+    let modes_arg = modes
+        .iter()
+        .map(|mode| mode.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
 
     for attempt in 0..repeat {
         let mut cmd = Command::new(&helper);
@@ -93,9 +105,9 @@ fn run_matrix(repo_root: &Path, probes: &[Probe], modes: &[String], repeat: u32)
     Ok(())
 }
 
-fn resolve_modes(requested: &[String]) -> Result<Vec<String>> {
+fn resolve_modes(requested: &[String]) -> Result<Vec<RunMode>> {
     let modes = if requested.is_empty() {
-        default_modes()
+        default_mode_names(Availability::for_host())
     } else {
         requested.to_vec()
     };
@@ -104,26 +116,12 @@ fn resolve_modes(requested: &[String]) -> Result<Vec<String>> {
         bail!("no execution modes resolved");
     }
 
-    let allowed: BTreeSet<&'static str> = ["baseline", "codex-sandbox", "codex-full"]
-        .into_iter()
-        .collect();
-    if let Some(invalid) = modes.iter().find(|mode| !allowed.contains(mode.as_str())) {
+    let allowed = allowed_mode_names();
+    if let Some(invalid) = modes.iter().find(|mode| !allowed.contains(&mode.as_str())) {
         bail!("unsupported mode requested: {invalid}");
     }
 
-    Ok(modes)
-}
-
-fn default_modes() -> Vec<String> {
-    if codex_present() {
-        vec![
-            "baseline".to_string(),
-            "codex-sandbox".to_string(),
-            "codex-full".to_string(),
-        ]
-    } else {
-        vec!["baseline".to_string()]
-    }
+    parse_modes(&modes)
 }
 
 fn resolve_selection(repo_root: &Path, selection: &Selection) -> Result<SelectionPlan> {

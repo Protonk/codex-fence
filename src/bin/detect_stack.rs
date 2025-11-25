@@ -4,7 +4,8 @@
 //! invoke it for every record. It reflects the current run mode (from CLI or
 //! env), infers sandbox/codex details, and emits a JSON `StackInfo` snapshot.
 
-use anyhow::{Result, bail};
+use anyhow::Result;
+use codex_fence::connectors::{RunMode, sandbox_override_from_env};
 use serde::Serialize;
 use std::env;
 use std::process::Command;
@@ -18,12 +19,13 @@ fn main() {
 
 fn run() -> Result<()> {
     let cli_run_mode = parse_cli_run_mode();
-    let run_mode = match cli_run_mode {
+    let run_mode_raw = match cli_run_mode {
         Some(mode) => mode,
         None => env_non_empty("FENCE_RUN_MODE").unwrap_or_else(|| usage_and_exit()),
     };
 
-    let sandbox_mode = determine_sandbox_mode(&run_mode, env_non_empty("FENCE_SANDBOX_MODE"))?;
+    let run_mode = RunMode::try_from(run_mode_raw.as_str())?;
+    let sandbox_mode = run_mode.sandbox_stack_value(sandbox_override_from_env())?;
     let codex_cli_version = detect_codex_cli_version();
     let codex_profile = env_non_empty("FENCE_CODEX_PROFILE");
     let os_info = detect_uname(&["-srm"]).unwrap_or_else(|| fallback_os_info());
@@ -57,19 +59,6 @@ fn parse_cli_run_mode() -> Option<String> {
         usage_and_exit();
     }
     Some(first)
-}
-
-fn determine_sandbox_mode(run_mode: &str, sandbox_env: Option<String>) -> Result<Option<String>> {
-    match run_mode {
-        "baseline" => Ok(None),
-        "codex-sandbox" => Ok(Some(
-            sandbox_env.unwrap_or_else(|| "workspace-write".to_string()),
-        )),
-        "codex-full" => Ok(Some(
-            sandbox_env.unwrap_or_else(|| "danger-full-access".to_string()),
-        )),
-        other => bail!("Unknown run mode: {other}"),
-    }
 }
 
 fn detect_codex_cli_version() -> Option<String> {

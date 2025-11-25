@@ -7,15 +7,17 @@
 //! - honor workspace overrides without silently falling back to host defaults
 
 use anyhow::{Context, Result, bail};
+use codex_fence::connectors::{
+    CommandSpec, PreflightPlan, RunMode, plan_for_mode, sandbox_override_from_env,
+};
 use codex_fence::fence_run_support::{
     ResolvedProbeMetadata, WorkspaceOverride, WorkspacePlan, canonicalize_path,
     classify_preflight_error, resolve_probe_metadata, workspace_plan_from_override,
     workspace_tmpdir_plan,
 };
-use codex_fence::{ProbeMetadata, codex_present, find_repo_root, resolve_probe};
+use codex_fence::{ProbeMetadata, find_repo_root, resolve_probe};
 use serde_json::json;
 use std::env;
-use std::env::VarError;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,28 +44,35 @@ fn run() -> Result<()> {
     let workspace_tmpdir = workspace_tmpdir_plan(&workspace_plan, &workspace_root);
     let command_cwd = command_cwd_for(&workspace_plan, &workspace_root);
 
-    let sandbox_mode = sandbox_mode_for_mode(&args.run_mode)?;
+    let sandbox_override = sandbox_override_from_env();
     let platform = detect_platform().unwrap_or_else(|| env::consts::OS.to_string());
-    let command_spec = build_command_spec(&args.run_mode, &platform, &resolved_probe.path)?;
+    let mode_plan = plan_for_mode(
+        &args.run_mode,
+        &platform,
+        &resolved_probe.path,
+        sandbox_override,
+    )?;
 
-    if codex_mode(&args.run_mode) {
+    if mode_plan.run_mode.is_codex() {
         if let Some(tmpdir) = workspace_tmpdir.path.as_ref() {
-            if run_codex_preflight(
-                &repo_root,
-                &args.run_mode,
-                &platform,
-                tmpdir,
-                &resolved_metadata,
-            )? {
-                // Preflight emitted a denial record; skip running the probe.
-                return Ok(());
+            if let Some(preflight) = mode_plan.preflight.as_ref() {
+                if run_preflight(
+                    preflight,
+                    &repo_root,
+                    &mode_plan.run_mode,
+                    tmpdir,
+                    &resolved_metadata,
+                )? {
+                    // Preflight emitted a denial record; skip running the probe.
+                    return Ok(());
+                }
             }
         } else if let Some((attempted, message)) = workspace_tmpdir.last_error.as_ref() {
             let command_str = format!("mkdir -p {}", attempted.display());
             emit_preflight_record(
                 &repo_root,
                 &resolved_metadata,
-                &args.run_mode,
+                mode_plan.run_mode.as_str(),
                 attempted,
                 1,
                 message,
@@ -74,9 +83,9 @@ fn run() -> Result<()> {
     }
 
     run_command(
-        command_spec,
-        &args.run_mode,
-        &sandbox_mode,
+        mode_plan.command,
+        &mode_plan.run_mode,
+        &mode_plan.sandbox_env,
         &workspace_plan,
         workspace_tmpdir.path.as_deref(),
         &command_cwd,
@@ -88,12 +97,6 @@ struct CliArgs {
     workspace_override: Option<WorkspaceOverride>,
     run_mode: String,
     probe_name: String,
-}
-
-/// Program and arguments used to execute the probe for a given mode.
-struct CommandSpec {
-    program: OsString,
-    args: Vec<OsString>,
 }
 
 impl CliArgs {
@@ -204,10 +207,6 @@ fn ensure_probe_executable(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn codex_mode(run_mode: &str) -> bool {
-    matches!(run_mode, "codex-sandbox" | "codex-full")
-}
-
 fn has_execute_bit(metadata: &fs::Metadata) -> bool {
     #[cfg(unix)]
     {
@@ -218,72 +217,6 @@ fn has_execute_bit(metadata: &fs::Metadata) -> bool {
     {
         metadata.is_file()
     }
-}
-
-fn sandbox_mode_for_mode(run_mode: &str) -> Result<OsString> {
-    let env_value = match env::var("FENCE_SANDBOX_MODE") {
-        Ok(value) if !value.is_empty() => Some(value),
-        Ok(_) => None,
-        Err(VarError::NotPresent) => None,
-        Err(VarError::NotUnicode(os)) => Some(os.to_string_lossy().into_owned()),
-    };
-
-    match run_mode {
-        "baseline" => Ok(OsString::from("")),
-        "codex-sandbox" => Ok(OsString::from(
-            env_value.unwrap_or_else(|| "workspace-write".to_string()),
-        )),
-        "codex-full" => Ok(OsString::from(
-            env_value.unwrap_or_else(|| "danger-full-access".to_string()),
-        )),
-        other => bail!("Unknown mode: {other}"),
-    }
-}
-
-fn build_command_spec(run_mode: &str, platform: &str, probe_path: &Path) -> Result<CommandSpec> {
-    let probe_arg = probe_path.as_os_str().to_os_string();
-    match run_mode {
-        "baseline" => Ok(CommandSpec {
-            program: probe_arg,
-            args: Vec::new(),
-        }),
-        "codex-sandbox" => {
-            ensure_codex_available()?;
-            let target = platform_target(platform)?;
-            Ok(CommandSpec {
-                program: OsString::from("codex"),
-                args: vec![
-                    OsString::from("sandbox"),
-                    OsString::from(target),
-                    OsString::from("--full-auto"),
-                    OsString::from("--"),
-                    probe_arg,
-                ],
-            })
-        }
-        "codex-full" => Ok(CommandSpec {
-            program: probe_arg,
-            args: Vec::new(),
-        }),
-        other => bail!("Unknown mode: {other}"),
-    }
-}
-
-fn platform_target(platform: &str) -> Result<&'static str> {
-    match platform {
-        "Darwin" => Ok("macos"),
-        "Linux" => Ok("linux"),
-        other => bail!("Unsupported platform for codex-sandbox: {other}"),
-    }
-}
-
-fn ensure_codex_available() -> Result<()> {
-    if codex_present() {
-        return Ok(());
-    }
-    bail!(
-        "codex CLI not found; codex-* modes require codex. Install codex or run baseline instead."
-    )
 }
 
 fn detect_platform() -> Option<String> {
@@ -302,7 +235,7 @@ fn detect_platform() -> Option<String> {
 
 fn run_command(
     spec: CommandSpec,
-    run_mode: &str,
+    run_mode: &RunMode,
     sandbox_mode: &OsString,
     workspace_plan: &WorkspacePlan,
     workspace_tmpdir: Option<&Path>,
@@ -313,7 +246,7 @@ fn run_command(
         command.arg(arg);
     }
     command.current_dir(command_cwd);
-    command.env("FENCE_RUN_MODE", run_mode);
+    command.env("FENCE_RUN_MODE", run_mode.as_str());
     command.env("FENCE_SANDBOX_MODE", sandbox_mode);
     if let Some(value) = workspace_plan.export_value.as_ref() {
         command.env("FENCE_WORKSPACE_ROOT", value);
@@ -418,17 +351,34 @@ fn emit_preflight_record(
     Ok(())
 }
 
+fn run_preflight(
+    plan: &PreflightPlan,
+    repo_root: &Path,
+    run_mode: &RunMode,
+    workspace_tmpdir: &Path,
+    metadata: &ResolvedProbeMetadata,
+) -> Result<bool> {
+    match plan {
+        PreflightPlan::CodexTmp { platform_target } => run_codex_preflight(
+            repo_root,
+            run_mode,
+            platform_target,
+            workspace_tmpdir,
+            metadata,
+        ),
+    }
+}
+
 fn run_codex_preflight(
     repo_root: &Path,
-    run_mode: &str,
-    platform: &str,
+    run_mode: &RunMode,
+    platform_target: &str,
     workspace_tmpdir: &Path,
     metadata: &ResolvedProbeMetadata,
 ) -> Result<bool> {
     // Detect hosts that block codex-managed writes before invoking the probe.
     // When blocked, emit a boundary object describing the denial so matrix runs
     // keep producing output for the affected mode.
-    ensure_codex_available()?;
     let suffix = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -436,18 +386,15 @@ fn run_codex_preflight(
     let target = workspace_tmpdir.join(format!("codex-preflight-{suffix}"));
 
     let mut args: Vec<OsString> = Vec::new();
-    match run_mode {
-        "codex-sandbox" => {
-            let platform_target = platform_target(platform)?;
-            args.push(OsString::from("sandbox"));
-            args.push(OsString::from(platform_target));
-            args.push(OsString::from("--full-auto"));
-            args.push(OsString::from("--"));
-            args.push(OsString::from("/bin/mkdir"));
-            args.push(OsString::from(target.as_os_str()));
-        }
-        "codex-full" => return Ok(false),
-        _ => return Ok(false),
+    if matches!(run_mode, RunMode::CodexSandbox) {
+        args.push(OsString::from("sandbox"));
+        args.push(OsString::from(platform_target));
+        args.push(OsString::from("--full-auto"));
+        args.push(OsString::from("--"));
+        args.push(OsString::from("/bin/mkdir"));
+        args.push(OsString::from(target.as_os_str()));
+    } else {
+        return Ok(false);
     }
 
     let command_str = format!(
@@ -474,7 +421,7 @@ fn run_codex_preflight(
     emit_preflight_record(
         repo_root,
         metadata,
-        run_mode,
+        run_mode.as_str(),
         &target,
         code,
         &stderr,
