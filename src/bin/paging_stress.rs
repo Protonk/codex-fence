@@ -6,6 +6,17 @@
 //! - 1: invalid arguments
 //! - 2: internal error (allocation or runtime failure)
 //! - 3: self-enforced timeout reached
+//!
+//! CLI:
+//! - `--megabytes <N>` — total allocation size in MiB (default: 8).
+//! - `--passes <N>` — number of full sweeps to perform (default: 1).
+//! - `--pattern <sequential|random>` — page access order (default: sequential).
+//! - `--max-seconds <N>` — optional self-enforced timeout.
+//! - `--help` — print usage.
+//!
+//! Probes invoke this helper with explicit arguments and interpret only the
+//! exit code so the probe contract (single JSON record, no stdout) stays
+//! intact.
 
 use std::io::{self, Write};
 use std::process::ExitCode;
@@ -332,3 +343,4 @@ impl XorShift64 {
         x
     }
 }
+

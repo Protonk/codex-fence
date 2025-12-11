@@ -76,5 +76,5 @@ test = false
 
 [[bin]]
 name = "paging-stress"
-path = "probe-runtime/paging-stress/src/main.rs"
+path = "src/bin/paging_stress.rs"
 test = false
