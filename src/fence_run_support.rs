@@ -4,9 +4,10 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-// Helper utilities shared by fence-run/fence-bang: workspace planning,
+// Helper utilities shared by probe-exec/probe-matrix: workspace planning,
 // preflight classification, and probe metadata resolution. Keeping these in one
-// place makes the defense-in-depth rules visible instead of buried in each CLI.
+// place makes the defense-in-depth rules visible instead of buried in each CLI
+// and keeps behavior aligned with the probe/docs contracts.
 
 #[derive(Clone)]
 pub enum WorkspaceOverride {
@@ -101,22 +102,26 @@ pub fn resolve_probe_metadata(
 }
 
 pub fn classify_preflight_error(stderr: &str) -> (&'static str, Option<&'static str>, String) {
-    // Pattern-match common Codex sandbox errors to normalize cfbo result fields.
+    // Pattern-match common external sandbox errors to normalize cfbo result fields.
     // This keeps preflight failures consistent with probe results.
     let lower = stderr.to_ascii_lowercase();
     if lower.contains("operation not permitted") {
         (
             "denied",
             Some("EPERM"),
-            "codex sandbox preflight denied (operation not permitted)".to_string(),
+            "external sandbox preflight denied (operation not permitted)".to_string(),
         )
     } else if lower.contains("permission denied") {
         (
             "denied",
             Some("EACCES"),
-            "codex sandbox preflight denied (permission denied)".to_string(),
+            "external sandbox preflight denied (permission denied)".to_string(),
         )
     } else {
-        ("error", None, "codex sandbox preflight failed".to_string())
+        (
+            "error",
+            None,
+            "external sandbox preflight failed".to_string(),
+        )
     }
 }

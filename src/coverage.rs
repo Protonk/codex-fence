@@ -147,8 +147,13 @@ mod tests {
         serde_json::to_writer(
             &mut file,
             &json!({
-                "schema_version": "macOS_codex_v1",
-                "scope": {"description": "test", "policy_layers": [], "categories": {}},
+                "schema_version": "sandbox_catalog_v1",
+                "catalog": {"key": "sample_catalog_v1", "title": "sample catalog"},
+                "scope": {
+                    "description": "test",
+                    "policy_layers": [{"id": "os_sandbox", "description": "sandbox"}],
+                    "categories": {"filesystem": "fs"}
+                },
                 "docs": {},
                 "capabilities": [{
                     "id": "cap_fs_read_workspace_tree",

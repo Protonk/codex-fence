@@ -1,16 +1,17 @@
 [package]
-name = "codex-fence"
-version = "0.5.0"
+name = "fencerunner"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.85"
-description = "Empirical sandbox probe harness for the codex CLI: hammers on sandbox boundaries and records every observation as JSON."
+description = "Portable sandbox probe harness: hammers on sandbox boundaries and records every observation as JSON."
 readme = "README.md"
 license = "Apache-2.0"
-repository = "https://github.com/Protonk/codex-fence"
-default-run = "codex-fence"
+repository = "https://github.com/Protonk/fencerunner"
+default-run = "probe"
 build = "build.rs"
 
 [lib]
+name = "fencerunner"
 doctest = false
 
 [dependencies]
@@ -19,28 +20,28 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.10"
 libc = "0.2"
+jsonschema = "0.17"
 
  [dev-dependencies]
- jsonschema = "0.17"
 
 [[bin]]
-name = "fence-bang"
-path = "src/bin/fence_bang.rs"
+name = "probe-matrix"
+path = "src/bin/probe_matrix.rs"
 test = false
 
 [[bin]]
-name = "fence-rattle"
-path = "src/bin/fence_rattle.rs"
+name = "probe-target"
+path = "src/bin/probe_target.rs"
 test = false
 
 [[bin]]
-name = "fence-listen"
-path = "src/bin/fence_listen.rs"
+name = "probe-listen"
+path = "src/bin/probe_listen.rs"
 test = false
 
 [[bin]]
-name = "fence-test"
-path = "src/bin/fence_test.rs"
+name = "probe-gate"
+path = "src/bin/probe_gate.rs"
 test = false
 
 [[bin]]
@@ -59,13 +60,13 @@ path = "src/bin/detect_stack.rs"
 test = false
 
 [[bin]]
-name = "fence-run"
-path = "src/bin/fence_run.rs"
+name = "probe-exec"
+path = "src/bin/probe_exec.rs"
 test = false
 
 [[bin]]
-name = "codex-fence"
-path = "src/bin/codex_fence.rs"
+name = "probe"
+path = "src/bin/probe_cli.rs"
 test = false
 
 [[bin]]

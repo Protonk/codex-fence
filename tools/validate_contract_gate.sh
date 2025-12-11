@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Probe contract validator (static + dynamic helpers).
+# Probe contract gate (static + dynamic helpers).
 #
+# - Canonical implementation of the probe contract gate used by probe authors,
+#   `bin/probe-contract-gate`, and `probe-gate`.
 # - Provides gate_static_probe/gate_probe functions for agents to source.
-# - CLI: run static scan over all probes (default), or gate a specific probe
-#   across modes with --probe.
+# - CLI: run a static contract scan over all probes (default), or gate a
+#   specific probe across modes with --probe.
 # - Emits an embedded emit-record stub (via --emit-record-stub) for dynamic
 #   validation; no separate stub file is needed.
 # -----------------------------------------------------------------------------
@@ -17,9 +19,9 @@ repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 maybe_exec_fence_test() {
   local candidate
   for candidate in \
-    "${repo_root}/target/debug/fence-test" \
-    "${repo_root}/target/release/fence-test" \
-    "${repo_root}/bin/fence-test"; do
+    "${repo_root}/target/debug/probe-gate" \
+    "${repo_root}/target/release/probe-gate" \
+    "${repo_root}/bin/probe-gate"; do
     if [[ -x "${candidate}" ]]; then
       FENCE_TEST_FORCE_SCRIPT=1 exec "${candidate}" "$@"
     fi
@@ -28,7 +30,7 @@ maybe_exec_fence_test() {
 
 paths_helper="${repo_root}/tools/resolve_paths.sh"
 modes_helper="${repo_root}/tools/list_run_modes.sh"
-fence_run_bin="${repo_root}/bin/fence-run"
+fence_run_bin="${repo_root}/bin/probe-exec"
 
 if [[ ! -f "${paths_helper}" ]]; then
   echo "${gate_name}: missing path helper at ${paths_helper}" >&2
@@ -627,7 +629,7 @@ run_dynamic_gate() {
   local run_mode="$5"
 
   if [[ ! -x "${fence_run_bin}" ]]; then
-    echo "${gate_name}: missing fence-run helper at ${fence_run_bin}" >&2
+    echo "${gate_name}: missing probe-exec helper at ${fence_run_bin}" >&2
     return 1
   fi
 
@@ -686,10 +688,10 @@ run_dynamic_gate() {
   local run_env=(env
     PATH="${path_prefix}"
     HOME="${shadow_root}"
-    CODEX_FENCE_ROOT="${shadow_root}"
+    FENCE_ROOT="${shadow_root}"
     PROBE_CONTRACT_GATE_STATE_DIR="${stub_state}"
     PROBE_CONTRACT_EXPECTED_RUN_MODE="${run_mode}"
-    PROBE_CONTRACT_CAPABILITIES_JSON="${repo_root}/schema/capabilities.json"
+    PROBE_CONTRACT_CAPABILITIES_JSON="${repo_root}/catalogs/macos_codex_v1.json"
     PROBE_CONTRACT_CAPABILITIES_ADAPTER="${repo_root}/tools/adapt_capabilities.sh")
 
   if [[ -n "${expected_probe_name}" ]]; then
@@ -699,7 +701,7 @@ run_dynamic_gate() {
     run_env+=("PROBE_CONTRACT_EXPECTED_PRIMARY_CAPABILITY_ID=${expected_primary_capability_id}")
   fi
 
-  # Run through fence-run so the gate matches real execution environment.
+  # Run through probe-exec so the gate matches real execution environment.
   run_env+=("${fence_run_bin}" "--workspace-root" "${shadow_root}" "${run_mode}" "${shadow_probe}")
 
   if ! run_with_timeout 5 "${run_env[@]}" >"${probe_stdout}" 2>"${probe_stderr}"; then

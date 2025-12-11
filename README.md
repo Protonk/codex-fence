@@ -1,120 +1,189 @@
-# codex-fence
+# Fencerunner
 
-> Empirically maps codex CLI sandbox capabilities with tiny probes and JSON logs.
+> Run small, explicit probes against a sandbox or runtime and capture what actually happened as structured JSON.
 
-An empirical security notebook for the codex CLI. `codex-fence` hammers on sandbox boundaries with dozens of tiny probes, watches what gets through, and writes every observation down as JSON. It never talks to models; it just asks “what can this runtime do?” and refuses to guess.
+Fencerunner is infrastructure. It does not impose a particular sandbox or policy;
+instead, it gives you a way to **describe capabilities**, **exercise them with tiny
+shell probes**, and **record the results as versioned JSON “boundary objects”**
+that can be analyzed later.
 
-## Why bother?
+The top‑level CLI is called `probe`. It discovers probes, runs them in
+well‑defined modes, validates their outputs against schemas and capability
+catalogs, and keeps the contract between “what probes promise” and “what
+actually ran” tight.
 
-macOS Seatbelt is quirky, Linux setups vary, and the `codex` security surface will change faster than release notes can explain. You don’t want to discover a policy regression because a model exfiltrated your notes. Running a pile of small, paranoid probes gives you an empirical read on what the fence actually allows today—no speculation, no trust in host metadata.
+For contributor‑focused details, see `CONTRIBUTING.md`. For contract‑level
+guidance, start with the AGENTS files.
 
-## Many wild probes with low noise
+## Mental model
 
-At a high level, this repo is a structured to allow wild probes to explore system behavior without inducing noise. It contains a number of probes already and is designed for generation of more in a tight loop. Three core pieces--a capability catalog, a suite of probes, and a boundary-object schema--are held in sync by tests and contracts enforced in code.
+At a high level, Fencerunner is built from three ideas:
 
-### Capability catalog
+- **Probes** — small Bash scripts under `probes/<probe_id>.sh`. Each performs
+  exactly one observable action (for example, “write a file outside the
+  workspace”) and calls a helper binary to emit a single JSON record describing
+  what happened.
+- **Capability catalog** — a JSON catalog that names the behaviors you care
+  about (`cap_fs_write_workspace_tree`, `cap_net_connect_loopback`, …) and
+  explains how they map onto low‑level operations. Probes refer to capabilities
+  by id; the harness resolves those ids against the catalog.
+- **Boundary objects (cfbo‑v1)** — the JSON records emitted by each probe run.
+  They encode the catalog key, probe identity, run mode, operation details,
+  normalized outcome, payload, and capability context, all validated against a
+  schema.
 
-The capability catalog in `schema/capabilities.json` (described in [docs/capabilities.md](docs/capabilities.md)) is the project’s ground truth about “things Codex might be allowed to do”: for example, reading user documents, opening outbound TCP sockets, spawning processes, or inspecting sandbox state. It names behaviors that can be mediated (filesystem, network, process, sandbox, etc.) as machine-readable capabilities.
+## Core CLI surface
 
-Each capability entry contains:
+The primary entry point is the `probe` binary (synced into `bin/probe`).
 
-* A stable id — what we call the demonstrated capability.
-* A category — what kind of system interaction it mediates.
-* A policy layer — what is doing the mediation (for example, the operating system or `codex`).
-* Human-readable description and notes.
+- `probe --matrix`  
+  Run a matrix of probes across one or more run modes and stream every
+  boundary object as NDJSON. This is the usual way to “take a reading” of a
+  sandbox or runtime.
 
-Probes and tooling never invent new capabilities on the fly; they pick from this catalog so coverage can be reasoned about and compared.
+- `probe --target`  
+  Run a focused subset of probes, selected either by probe id or by capability
+  id in the catalog. This is useful when you only care about a specific slice
+  of behavior.
 
-### Probes and Probe Authors
+- `probe --listen`  
+  Read cfbo‑v1 NDJSON (for example, from `probe --matrix`) on stdin and print a
+  human‑readable summary. This is a text‑only viewer; it never changes the
+  underlying JSON.
 
-Probes are small, focused Bash scripts under `probes/<probe_id>.sh`. They are the only code in the repo that directly touches the sandboxed runtime. Everything else is harness, infrastructure, or interpretation. Probes connect catalog to boundary object: they exercise specific capabilities and emit a single JSON record.
 
-The Probe Author contract is defined in detail at [probes/AGENTS.md](probes/AGENTS.md). In short, a probe:
+## Probes: how you measure a sandbox
 
-1. Lives at `probes/<probe_id>.sh` and uses `#!/usr/bin/env bash` with `set -euo pipefail`.
-2. Performs exactly one focused operation (for example, one write attempt outside the workspace, one DNS query, one `sysctl` read).
-3. Calls `bin/emit-record` exactly once with the right flags to produce a cfbo-v1 JSON record, including `--run-mode "$FENCE_RUN_MODE"` exported by `bin/fence-run`.
-4. Prints that JSON record to stdout and exits with status 0 so the harness can treat the probe as “observed” even when the underlying operation is denied.
+Probes are intentionally boring:
 
-Probe Authors do not need to know Rust internals, sandbox profile syntax, or Codex implementation details. They just need to satisfy their contract and let the surrounding infrastructure keep everything coherent.
-When a probe needs low-level or performance-sensitive behavior, it may shell
-out to a small compiled helper under `probe-runtime/` (synced into `bin/` by
-`make build-bin`). Helpers stay quiet on stdout and return stable exit codes;
-the probe remains the orchestrator and still emits the single boundary object.
+- They are Bash scripts in `probes/<probe_id>.sh`.
+- They use `#!/usr/bin/env bash` plus `set -euo pipefail`.
+- They perform one focused operation.
+- They call `bin/emit-record` exactly once to emit a JSON boundary object.
+- They write nothing else to stdout (stderr is reserved for minimal diagnostics).
 
-### Boundary objects (cfbo-v1)
+Each probe declares:
 
-Every probe run must emit exactly one boundary object, a JSON document with schema version `cfbo-v1` defined in `schema/boundary_object.json` and described in `docs/boundary_object.md`. This defines exactly what each observation must record, allowing many probes to map cleanly from capability to record.
+- a `probe.id` (the filename),
+- a `primary_capability_id` and optional `secondary_capability_ids` from the
+  catalog, and
+- a normalized `observed_result` (`success`, `denied`, `partial`, `error`)
+  plus payload snippets that capture what actually happened.
 
-A record contains, among other fields:
+The probe author contract, examples, and test‑backed rules live in
+`probes/AGENTS.md`. Start there if you are writing or modifying probes.
 
-* `probe`: who ran (id, version).
-* `run`: how it ran (mode, command, timestamps, exit code).
-* `operation`: what was attempted (category, verb, target, operation args).
-* `result`: what actually happened (`observed_result`, errno/message, payload).
-* `capability_context`: snapshots of the primary and secondary capabilities the probe claims to exercise.
+## Catalogs and boundary schemas
 
-The goal is that a single record, plus the catalog snapshot it points at, is a portable explanation of “this runtime could or could not do X under these conditions.”
+Two JSON schemas define how data flows through Fencerunner:
 
-## Quick start
+- **Capability catalog schema**  
+  `schema/capability_catalog.schema.json` describes the shape of capability
+  catalogs. The bundled catalog instance lives in
+  `catalogs/macos_codex_v1.json` and is keyed by `catalog.key` (the
+  `capabilities_schema_version` echoed into boundary objects).
 
-### Requirements
+- **Boundary object schema (cfbo‑v1)**  
+  `schema/boundary_object.json` describes the cfbo‑v1 JSON records emitted by
+  probes. `docs/boundary_object.md` walks each field and explains evolution
+  rules.
 
-* POSIX shell with `bash` 3.2 or newer
-* `make`
-* Rust toolchain (to build helper binaries and run tests)
-* `python3` (used by some probes)
-* Codex CLI on `PATH` (required for Codex modes; baseline mode can run without it)
+The harness always requires a catalog and a boundary schema, but you can swap
+them out without changing code:
 
-### Build and (optionally) install
+- Use `--catalog <path>` or `FENCE_CATALOG_PATH` to point helpers at a different
+  catalog file.
+- Use `FENCE_ALLOWED_CATALOG_SCHEMAS` (comma‑separated) to temporarily accept
+  additional catalog `schema_version` values while experimenting.
+- Use `--boundary-schema <path>` or `FENCE_BOUNDARY_SCHEMA_PATH` to point
+  helpers at an alternate boundary‑object schema file; the loaded
+  `schema_version` is written into emitted records.
 
-To compile the helper binaries into `bin/`:
+The Rust layer (`src/catalog`, `src/boundary`) validates catalogs and boundary
+objects at load and emit time, and the integration tests under `tests/suite.rs`
+assert that the schemas, helpers, and sample data stay in sync.
+
+For a narrative view of these contracts, see:
+
+- `docs/capabilities.md`
+- `docs/boundary_object.md`
+- `docs/probes.md`
+
+---
+
+## Running and developing Fencerunner
+
+Prerequisites:
+
+- A recent Rust toolchain (see `Cargo.toml` for the minimum version).
+- A POSIX shell environment with `/bin/bash` and common Unix tools.
+
+Build the helpers into `bin/`:
 
 ```sh
-make build-bin
+make build
 ```
 
-To install the main CLI on your `PATH` (adjust `PREFIX` as needed):
+Run the main test suite:
 
 ```sh
-make install PREFIX=~/.local
+make test          # rebuild helpers, then cargo test --test suite
 ```
 
-Ensure `~/.local/bin` (or your chosen prefix) is on your `PATH`.
+Common workflows:
 
-You can also invoke the compiled binary directly from `target/release/codex-fence` if you prefer building with `cargo`.
+- **Run the full probe matrix with the bundled catalog and schema**
 
-### Run probes
+  ```sh
+  bin/probe --matrix
+  ```
 
-Run the full matrix of probes in all available modes (defaults to `baseline`, plus `codex-sandbox` and `codex-full` when the Codex CLI is on `PATH`) and stream NDJSON to stdout:
+- **Inspect results in a human‑readable form**
 
-```sh
-codex-fence --bang
-```
+  ```sh
+  bin/probe --matrix | bin/probe --listen
+  ```
 
-Limit the run to a subset of modes:
+- **Run a single probe by id**
 
-```sh
-MODES="baseline codex-sandbox codex-full" codex-fence --bang
-```
+  ```sh
+  bin/probe --target --probe fs_outside_workspace --mode baseline
+  ```
 
-With `--rattle` you can select a capability or probe by id and optionally restrict the modes with `--mode` (repeatable):
+- **Gate a probe while authoring**
 
-```sh
-codex-fence --rattle --cap cap_fs_read_workspace_tree --mode codex-sandbox --mode codex-full
-codex-fence --rattle --probe fs_outside_workspace --mode baseline
-```
+  ```sh
+  tools/validate_contract_gate.sh --probe fs_outside_workspace
+  # or
+  bin/probe-contract-gate fs_outside_workspace
+  ```
 
-### Inspect what happened
+When you change Rust code under `src/` or `src/bin/`, rebuild helpers with
+`make build` and re‑run `make test` to keep `bin/` and the test suite aligned.
 
-`codex-fence --bang` emits one JSON record per probe run (cfbo-v1) as NDJSON.
+---
 
-For a quick human view, pipe into the listener:
+## Repository layout and navigation
 
-```sh
-codex-fence --bang | codex-fence --listen
-```
+The top‑level `AGENTS.md` is the router for this project: it tells you which
+directory‑specific `AGENTS.md` file to read before editing a given area. At a
+glance:
 
-## Attitude
+- `probes/` — probe scripts and their authoring contract.
+- `schema/`, `catalogs/` — JSON schemas and catalog instances.
+- `src/` — Rust library and shared runtime logic.
+- `src/bin/` — Rust helpers that back the `probe` CLI and helpers in `bin/`.
+- `tests/` — integration suite that enforces contracts.
+- `tools/` — authoring and contract‑gate tooling.
+- `docs/` — human‑readable explanations for schemas, probes, and boundary
+  objects.
 
-This project chooses paranoia and redundancy over cleverness. The catalog is machine-readable, the probes are noisy and literal, and the records are strict. If something changes in your fence, you will see it in JSON rather than in a blog post. That is the point.
+Before you change behavior, skim:
+
+- `AGENTS.md` at the repo root,
+- the `AGENTS.md` for the directory you are touching, and
+- any relevant docs in `docs/`.
+
+Those files explain the contracts that code and tests are expected to uphold. The tests in `tests/` are intentionally opinionated and high‑coverage: keeping
+them green is the easiest way to ensure usage remains compatible with the
+contracts described above.

@@ -7,8 +7,8 @@ emit_record_bin="${repo_root}/bin/emit-record"
 run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="fs_outside_workspace"
 primary_capability_id="cap_fs_write_workspace_tree"
-target_path="${FENCE_FS_OUTSIDE_TARGET:-/tmp/codex-fence-outside-root-test}"
-attempt_line="codex-fence write $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+target_path="${FENCE_FS_OUTSIDE_TARGET:-/tmp/probe-outside-root-test}"
+attempt_line="probe write $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf -v command_executed "printf %q >> %q" "${attempt_line}" "${target_path}"
 
 stdout_tmp=$(mktemp)

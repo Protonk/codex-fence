@@ -6,18 +6,22 @@
 //! expected to use snapshots from the capability catalog resolved at runtime.
 
 use crate::catalog::{Capability, CapabilityId, CapabilitySnapshot, CatalogKey, CatalogRepository};
+use anyhow::{Context, Result, bail};
+use jsonschema::JSONSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
 use std::io::BufRead;
+use std::path::Path;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Full boundary object captured for a single probe execution.
 ///
 /// This struct encodes the cfbo-v1 contract: stack metadata captured at runtime
 /// plus the probe/run/operation/result blocks emitted by `bin/emit-record`.
-/// `capabilities_schema_version` remains `None` until a catalog snapshot is
-/// attached via [`BoundaryObject::with_capabilities`].
+/// `capabilities_schema_version` is expected to be set for new records, but
+/// remains optional here so legacy boundary objects can still be parsed.
 pub struct BoundaryObject {
     pub schema_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -38,10 +42,10 @@ pub struct BoundaryObject {
 /// description so downstream consumers can correlate results with host
 /// characteristics.
 pub struct StackInfo {
-    #[serde(default)]
-    pub codex_cli_version: Option<String>,
-    #[serde(default)]
-    pub codex_profile: Option<String>,
+    #[serde(default, alias = "codex_cli_version")]
+    pub external_cli_version: Option<String>,
+    #[serde(default, alias = "codex_profile")]
+    pub external_profile: Option<String>,
     #[serde(default)]
     pub sandbox_mode: Option<String>,
     pub os: String,
@@ -194,6 +198,72 @@ fn empty_object() -> Value {
     Value::Object(Default::default())
 }
 
+#[derive(Debug)]
+/// Loaded boundary-object schema with a cached JSONSchema validator.
+pub struct BoundarySchema {
+    schema_version: String,
+    compiled: JSONSchema,
+    #[allow(dead_code)]
+    raw: Arc<Value>,
+}
+
+impl BoundarySchema {
+    /// Load a boundary-object schema from disk and compile it.
+    pub fn load(path: &Path) -> Result<Self> {
+        let raw_value: Value = serde_json::from_reader(
+            std::fs::File::open(path)
+                .with_context(|| format!("opening boundary schema {}", path.display()))?,
+        )?;
+        let raw = Arc::new(raw_value);
+        let schema_version =
+            extract_schema_version(&raw).context("boundary schema missing schema_version const")?;
+        // JSONSchema stores references to the provided schema value; keep it
+        // alive via Arc and use a stable pointer for compilation.
+        let raw_static: &'static Value = unsafe { &*(Arc::as_ptr(&raw)) };
+        let compiled = JSONSchema::compile(raw_static)
+            .with_context(|| format!("compiling boundary schema {}", path.display()))?;
+        Ok(Self {
+            schema_version,
+            compiled,
+            raw,
+        })
+    }
+
+    /// Extracted schema version (from `properties.schema_version.const`).
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+
+    /// Validate a JSON value against the compiled schema.
+    pub fn validate(&self, value: &Value) -> Result<()> {
+        if let Err(errors) = self.compiled.validate(value) {
+            let mut details = Vec::new();
+            for err in errors {
+                details.push(err.to_string());
+            }
+            bail!(
+                "boundary object failed schema validation:\n{}",
+                details.join("\n")
+            );
+        }
+        Ok(())
+    }
+}
+
+fn extract_schema_version(schema: &Value) -> Option<String> {
+    let version = schema
+        .pointer("/properties/schema_version/const")
+        .and_then(Value::as_str)?;
+    if version
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+    {
+        Some(version.to_string())
+    } else {
+        None
+    }
+}
+
 impl fmt::Display for BoundaryReadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -254,8 +324,8 @@ pub fn read_boundary_objects<R: BufRead>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::collections::HashSet;
-    use std::fs::File;
     use std::io::{BufReader, Cursor};
     use std::path::PathBuf;
 
@@ -263,7 +333,7 @@ mod tests {
     fn parses_golden_snippet_ndjson() {
         let records =
             read_boundary_objects(golden_snippet_reader()).expect("golden snippet parses");
-        assert_eq!(records.len(), 10, "golden snippet should have 10 records");
+        assert_eq!(records.len(), 3, "golden snippet should have 3 records");
 
         let has_success = records
             .iter()
@@ -313,14 +383,14 @@ mod tests {
     }
 
     fn sample_record(probe_id: &str, observed_result: &str) -> String {
-        use serde_json::json;
-
+        let schema_version = current_schema_version();
+        let catalog_key = current_catalog_key();
         json!({
-            "schema_version": "cfbo-v1",
-            "capabilities_schema_version": "macOS_codex_v1",
+            "schema_version": schema_version,
+            "capabilities_schema_version": catalog_key,
             "stack": {
-                "codex_cli_version": "codex-cli 0.63.0",
-                "codex_profile": null,
+                "external_cli_version": "codex-cli 0.63.0",
+                "external_profile": null,
                 "sandbox_mode": null,
                 "os": "Darwin 23.4.0 arm64"
             },
@@ -357,10 +427,7 @@ mod tests {
                 "primary": {
                     "id": "cap_sample",
                     "category": "fs",
-                    "layer": "sandbox",
-                    "title": "Sample capability",
-                    "description": "",
-                    "modes": []
+                    "layer": "os_sandbox"
                 },
                 "secondary": []
             }
@@ -368,10 +435,30 @@ mod tests {
         .to_string()
     }
 
-    fn golden_snippet_reader() -> BufReader<File> {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/mocks/cfbo-golden-snippet.ndjson");
-        let file = File::open(&path).expect("golden snippet fixture available");
-        BufReader::new(file)
+    fn golden_snippet_reader() -> BufReader<Cursor<Vec<u8>>> {
+        let records = vec![
+            sample_record("probe_success", "success"),
+            sample_record("probe_denied", "denied"),
+            sample_record("probe_partial", "partial"),
+        ];
+        let ndjson = records.join("\n");
+        BufReader::new(Cursor::new(ndjson.into_bytes()))
+    }
+
+    fn current_schema_version() -> String {
+        let path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::DEFAULT_BOUNDARY_SCHEMA_PATH);
+        BoundarySchema::load(&path)
+            .expect("boundary schema loads")
+            .schema_version()
+            .to_string()
+    }
+
+    fn current_catalog_key() -> CatalogKey {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::DEFAULT_CATALOG_PATH);
+        crate::load_catalog_from_path(&path)
+            .expect("catalog loads")
+            .catalog
+            .key
     }
 }

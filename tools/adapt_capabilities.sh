@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # Guard-rail summary:
-#   * Normalizes `schema/capabilities.json` into a predictable, jq-validated map
-#     keyed by capability ID so other tooling can rely on a single canonical
+#   * Normalizes the bundled capability catalog into a predictable, jq-validated
+#     map keyed by capability ID so other tooling can rely on a single canonical
 #     structure.
-#   * Enforces the schema version and fails fast on missing files or IDs to keep
-#     downstream validation scripts from operating on stale or partial data.
+#   * Enforces the catalog schema version and fails fast on missing files or IDs
+#     to keep downstream validation scripts from operating on stale or partial
+#     data.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
-expected_schema_version="macOS_codex_v1"
+expected_schema_version="sandbox_catalog_v1"
 adapter_name="adapt_capabilities"
 
-# Allow callers to override the default schema path (useful for tests).
-capabilities_file="${1:-${repo_root}/schema/capabilities.json}"
+# Allow callers to override the default catalog path (useful for tests).
+capabilities_file="${1:-${repo_root}/catalogs/macos_codex_v1.json}"
 
 if [[ ! -f "${capabilities_file}" ]]; then
   echo "${adapter_name}: unable to find capabilities.json at ${capabilities_file}" >&2
@@ -48,12 +49,19 @@ def normalize_sources:
       url_hint: (.url_hint // null)
     } | with_entries(select(.value != null)));
 
+def catalog_key:
+  (.catalog | to_object | .key // "");
+
 if (.schema_version | type) != "string" then
   error("adapt_capabilities: expected schema_version to be a string, got \(.schema_version|type)")
 elif (.schema_version | test("^[A-Za-z0-9_.-]+$") | not) then
   error("adapt_capabilities: schema_version must match ^[A-Za-z0-9_.-]+$, got \(.schema_version)")
 elif .schema_version != $expected_version then
   error("adapt_capabilities: expected schema_version=\($expected_version), got \(.schema_version)")
+elif (catalog_key | type) != "string" or (catalog_key | length) == 0 then
+  error("adapt_capabilities: expected catalog.key to be a non-empty string")
+elif (catalog_key | test("^[A-Za-z0-9_.-]+$") | not) then
+  error("adapt_capabilities: catalog.key must match ^[A-Za-z0-9_.-]+$, got \(catalog_key)")
 else
   (.capabilities // [])
   | reduce .[] as $cap (
@@ -69,7 +77,9 @@ else
           category: ($cap.category // null),
           layer: ($cap.layer // null),
           description: ($cap.description // null),
+          status: ($cap.status // null),
           notes: ($cap.notes // null),
+          labels: ($cap.labels | to_array),
           operations: {
             allow: ($ops.allow | to_array),
             deny: ($ops.deny | to_array)

@@ -1,25 +1,27 @@
 #![cfg(unix)]
 
-// Centralized integration suite for the fence harness; exercises schema validation,
+// Centralized integration suite for the probe harness; exercises schema validation,
 // probe resolution rules, and helper utilities so changes surface in one place.
 mod support;
 
 use anyhow::{Context, Result, bail};
-use codex_fence::emit_support::{
+use fencerunner::emit_support::{
     JsonObjectBuilder, PayloadArgs, TextSource, normalize_secondary_ids, validate_status,
 };
-use codex_fence::fence_run_support::{
+use fencerunner::fence_run_support::{
     WorkspaceOverride, canonicalize_path, classify_preflight_error, resolve_probe_metadata,
     workspace_plan_from_override, workspace_tmpdir_plan,
 };
-use codex_fence::{
-    self, BoundaryObject, CapabilityCategory, CapabilityContext, CapabilityId, CapabilityIndex,
-    CapabilityLayer, CapabilitySnapshot, CatalogKey, CatalogRepository, OperationInfo, Payload,
-    Probe, ProbeInfo, ProbeMetadata, ResultInfo, RunInfo, StackInfo, codex_present, list_probes,
+use fencerunner::{
+    self, BoundaryObject, BoundarySchema, CapabilityCategory, CapabilityContext, CapabilityId,
+    CapabilityIndex, CapabilityLayer, CapabilitySnapshot, CatalogKey, CatalogRepository,
+    DEFAULT_BOUNDARY_SCHEMA_PATH, DEFAULT_CATALOG_PATH, OperationInfo, Payload, Probe, ProbeInfo,
+    ProbeMetadata, ResultInfo, RunInfo, StackInfo, external_cli_present, list_probes,
     load_catalog_from_path, resolve_helper_binary, resolve_probe,
 };
 use jsonschema::JSONSchema;
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -75,25 +77,22 @@ fn boundary_object_schema() -> Result<()> {
         .arg("{\"fixture\":true}")
         .arg("--payload-file")
         .arg(payload_file.path());
-    emit_cmd.env("CODEX_FENCE_PREFER_TARGET", "1");
+    emit_cmd.env("FENCE_PREFER_TARGET", "1");
     let output = run_command(emit_cmd)?;
 
     let (record, value) = parse_boundary_object(&output.stdout)?;
 
-    assert_eq!(record.schema_version, "cfbo-v1");
-    assert!(value.get("capabilities_schema_version").is_some());
-    if let Some(cap_schema) = value.get("capabilities_schema_version") {
-        if let Some(cap_schema_str) = cap_schema.as_str() {
-            assert!(
-                cap_schema_str
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-')),
-                "capabilities_schema_version must match ^[A-Za-z0-9_.-]+$"
-            );
-        } else {
-            assert!(cap_schema.is_null());
-        }
-    }
+    assert_eq!(record.schema_version, boundary_schema_version());
+    let cap_schema = value
+        .get("capabilities_schema_version")
+        .and_then(Value::as_str)
+        .expect("capabilities_schema_version present");
+    assert!(
+        cap_schema
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-')),
+        "capabilities_schema_version must match ^[A-Za-z0-9_.-]+$"
+    );
 
     assert!(value.get("stack").map(|s| s.is_object()).unwrap_or(false));
     assert_eq!(record.probe.id, "schema_test_fixture");
@@ -210,7 +209,35 @@ fn boundary_object_schema() -> Result<()> {
     Ok(())
 }
 
-// Runs the minimal fixture probe through fence-run baseline to confirm the
+// Confirms the bundled capability catalog satisfies the generic catalog schema.
+#[test]
+fn capability_catalog_schema() -> Result<()> {
+    let repo_root = repo_root();
+    let schema_path = repo_root.join("schema/capability_catalog.schema.json");
+    let catalog_path = repo_root.join(DEFAULT_CATALOG_PATH);
+
+    static CATALOG_SCHEMA: OnceLock<Value> = OnceLock::new();
+    let schema_value = if let Some(existing) = CATALOG_SCHEMA.get() {
+        existing
+    } else {
+        let loaded: Value = serde_json::from_reader(File::open(&schema_path)?)?;
+        CATALOG_SCHEMA.get_or_init(move || loaded)
+    };
+    let catalog_value: Value = serde_json::from_reader(File::open(&catalog_path)?)?;
+
+    let compiled = JSONSchema::compile(schema_value)?;
+    if let Err(errors) = compiled.validate(&catalog_value) {
+        let details = errors
+            .map(|err| err.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        bail!("capability catalog failed schema validation:\n{details}");
+    }
+
+    Ok(())
+}
+
+// Runs the minimal fixture probe through probe-exec baseline to confirm the
 // generated record reflects success and payload propagation.
 #[test]
 fn harness_smoke_probe_fixture() -> Result<()> {
@@ -218,9 +245,9 @@ fn harness_smoke_probe_fixture() -> Result<()> {
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let mut baseline_cmd = Command::new(helper_binary(&repo_root, "fence-run"));
+    let mut baseline_cmd = Command::new(helper_binary(&repo_root, "probe-exec"));
     baseline_cmd
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .arg("baseline")
         .arg(fixture.probe_id());
     let output = run_command(baseline_cmd)?;
@@ -252,11 +279,11 @@ fn baseline_no_codex_smoke() -> Result<()> {
 
     let sanitized_path = sanitized_path_without_codex()?;
 
-    let fence_run = helper_binary(&repo_root, "fence-run");
-    let mut baseline_cmd = Command::new(&fence_run);
+    let probe_run = helper_binary(&repo_root, "probe-exec");
+    let mut baseline_cmd = Command::new(&probe_run);
     baseline_cmd
         .env("PATH", &sanitized_path)
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .arg("baseline")
         .arg(fixture.probe_id());
     let baseline_output = run_command(baseline_cmd)?;
@@ -264,13 +291,25 @@ fn baseline_no_codex_smoke() -> Result<()> {
     assert_eq!(record.probe.id, fixture.probe_id());
     assert_eq!(record.result.observed_result, "success");
 
-    let sandbox_result = Command::new(&fence_run)
+    let mut codex_full_cmd = Command::new(&probe_run);
+    codex_full_cmd
         .env("PATH", &sanitized_path)
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
+        .arg("codex-full")
+        .arg(fixture.probe_id());
+    let codex_full_output = run_command(codex_full_cmd)?;
+    let (full_record, _) = parse_boundary_object(&codex_full_output.stdout)?;
+    assert_eq!(full_record.run.mode, "codex-full");
+    assert_eq!(full_record.probe.id, fixture.probe_id());
+    assert_eq!(full_record.result.observed_result, "success");
+
+    let sandbox_result = Command::new(&probe_run)
+        .env("PATH", &sanitized_path)
+        .env("FENCE_PREFER_TARGET", "1")
         .arg("codex-sandbox")
         .arg(fixture.probe_id())
         .output()
-        .context("failed to execute fence-run codex-sandbox")?;
+        .context("failed to execute probe-exec codex-sandbox")?;
     assert!(
         !sandbox_result.status.success(),
         "codex-sandbox unexpectedly succeeded without codex (stdout: {}, stderr: {})",
@@ -290,11 +329,11 @@ fn workspace_root_fallback() -> Result<()> {
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
     let temp_run_dir = TempDir::new()?;
 
-    let mut fallback_cmd = Command::new(helper_binary(&repo_root, "fence-run"));
+    let mut fallback_cmd = Command::new(helper_binary(&repo_root, "probe-exec"));
     fallback_cmd
         .current_dir(temp_run_dir.path())
         .env("FENCE_WORKSPACE_ROOT", "")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .arg("baseline")
         .arg(fixture.probe_id());
     let output = run_command(fallback_cmd)?;
@@ -328,15 +367,15 @@ fn probe_resolution_guards() -> Result<()> {
     perms.set_mode(0o755);
     fs::set_permissions(&outside_script, perms)?;
 
-    let abs_result = Command::new(helper_binary(&repo_root, "fence-run"))
+    let abs_result = Command::new(helper_binary(&repo_root, "probe-exec"))
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .arg(&outside_script)
         .output()
-        .context("failed to execute fence-run outside script")?;
+        .context("failed to execute probe-exec outside script")?;
     assert!(
         !abs_result.status.success(),
-        "fence-run executed script outside probes/ (stdout: {}, stderr: {})",
+        "probe-exec executed script outside probes/ (stdout: {}, stderr: {})",
         String::from_utf8_lossy(&abs_result.stdout),
         String::from_utf8_lossy(&abs_result.stderr)
     );
@@ -353,15 +392,15 @@ fn probe_resolution_guards() -> Result<()> {
         path: symlink_path.clone(),
     };
 
-    let symlink_result = Command::new(helper_binary(&repo_root, "fence-run"))
+    let symlink_result = Command::new(helper_binary(&repo_root, "probe-exec"))
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .arg("tests_probe_resolution_symlink")
         .output()
-        .context("failed to execute fence-run via symlink")?;
+        .context("failed to execute probe-exec via symlink")?;
     assert!(
         !symlink_result.status.success(),
-        "fence-run followed a symlink that escapes probes/ (stdout: {}, stderr: {})",
+        "probe-exec followed a symlink that escapes probes/ (stdout: {}, stderr: {})",
         String::from_utf8_lossy(&symlink_result.stdout),
         String::from_utf8_lossy(&symlink_result.stderr)
     );
@@ -369,10 +408,10 @@ fn probe_resolution_guards() -> Result<()> {
     Ok(())
 }
 
-// Ensures fence-bang surfaces malformed probe output without blocking the
+// Ensures probe-matrix surfaces malformed probe output without blocking the
 // remaining probes from running.
 #[test]
-fn fence_bang_continues_after_malformed_probe() -> Result<()> {
+fn probe_matrix_continues_after_malformed_probe() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let good = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
@@ -384,20 +423,20 @@ exit 0
     let broken =
         FixtureProbe::install_from_contents(&repo_root, "tests_malformed_probe", broken_contents)?;
 
-    let mut cmd = Command::new(helper_binary(&repo_root, "fence-bang"));
+    let mut cmd = Command::new(helper_binary(&repo_root, "probe-matrix"));
     cmd.env(
         "PROBES",
         format!("{},{}", broken.probe_id(), good.probe_id()),
     )
     .env("MODES", "baseline")
-    .env("CODEX_FENCE_PREFER_TARGET", "1");
+    .env("FENCE_PREFER_TARGET", "1");
     let output = cmd
         .output()
-        .context("failed to execute fence-bang with malformed probe")?;
+        .context("failed to execute probe-matrix with malformed probe")?;
 
     assert!(
         !output.status.success(),
-        "fence-bang should fail when a probe emits invalid JSON"
+        "probe-matrix should fail when a probe emits invalid JSON"
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lines: Vec<&str> = stdout.lines().collect();
@@ -418,23 +457,23 @@ exit 0
     Ok(())
 }
 
-// Smoke-tests the codex-fence --rattle CLI end-to-end with a single probe.
+// Smoke-tests the probe --target CLI end-to-end with a single probe.
 #[test]
-fn fence_rattle_runs_single_probe() -> Result<()> {
+fn probe_target_runs_single_probe() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let codex_fence = helper_binary(&repo_root, "codex-fence");
-    let mut cmd = Command::new(&codex_fence);
-    cmd.arg("--rattle")
+    let probe = helper_binary(&repo_root, "probe");
+    let mut cmd = Command::new(&probe);
+    cmd.arg("--target")
         .arg("--probe")
         .arg(fixture.probe_id())
         .arg("--mode")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
-    let stdout = String::from_utf8(output.stdout).context("rattle stdout utf-8")?;
+    let stdout = String::from_utf8(output.stdout).context("target stdout utf-8")?;
     let lines: Vec<&str> = stdout
         .lines()
         .map(str::trim)
@@ -452,22 +491,22 @@ fn fence_rattle_runs_single_probe() -> Result<()> {
     Ok(())
 }
 
-// Verifies --repeat fans out through fence-bang and yields multiple boundary objects.
+// Verifies --repeat fans out through probe-matrix and yields multiple boundary objects.
 #[test]
-fn fence_rattle_repeats_probe_runs() -> Result<()> {
+fn probe_target_repeats_probe_runs() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let rattle = helper_binary(&repo_root, "fence-rattle");
-    let mut cmd = Command::new(&rattle);
+    let target_runner = helper_binary(&repo_root, "probe-target");
+    let mut cmd = Command::new(&target_runner);
     cmd.arg("--probe")
         .arg(fixture.probe_id())
         .arg("--mode")
         .arg("baseline")
         .arg("--repeat")
         .arg("2")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8(output.stdout).context("repeat stdout utf-8")?;
     let lines: Vec<&str> = stdout
@@ -491,18 +530,18 @@ fn fence_rattle_repeats_probe_runs() -> Result<()> {
 
 // Ensures capability selection resolves the bundled catalog and runs every probe in that slice.
 #[test]
-fn fence_rattle_runs_capability_subset() -> Result<()> {
+fn probe_target_runs_capability_subset() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let rattle = helper_binary(&repo_root, "fence-rattle");
-    let mut cmd = Command::new(&rattle);
+    let target_runner = helper_binary(&repo_root, "probe-target");
+    let mut cmd = Command::new(&target_runner);
     cmd.arg("--cap")
         .arg("cap_fs_read_workspace_tree")
         .arg("--mode")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8(output.stdout).context("capability stdout utf-8")?;
     let lines: Vec<&str> = stdout
@@ -535,12 +574,12 @@ fn fence_rattle_runs_capability_subset() -> Result<()> {
 fn proc_paging_stress_probe_emits_expected_record() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
-    let fence_run = helper_binary(&repo_root, "fence-run");
+    let probe_run = helper_binary(&repo_root, "probe-exec");
 
-    let mut cmd = Command::new(&fence_run);
+    let mut cmd = Command::new(&probe_run);
     cmd.arg("baseline")
         .arg("proc_paging_stress")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let (record, value) = parse_boundary_object(&output.stdout)?;
     assert_eq!(record.probe.id, "proc_paging_stress");
@@ -566,23 +605,23 @@ fn proc_paging_stress_probe_emits_expected_record() -> Result<()> {
 
 // Dry-run listing should summarize the plan without emitting JSON.
 #[test]
-fn fence_rattle_list_only_reports_plan() -> Result<()> {
+fn probe_target_list_only_reports_plan() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let _fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let rattle = helper_binary(&repo_root, "fence-rattle");
-    let mut cmd = Command::new(&rattle);
+    let target_runner = helper_binary(&repo_root, "probe-target");
+    let mut cmd = Command::new(&target_runner);
     cmd.arg("--cap")
         .arg("cap_fs_read_workspace_tree")
         .arg("--mode")
         .arg("baseline")
         .arg("--list-only")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8(output.stdout).context("list-only stdout utf-8")?;
     assert!(
-        stdout.contains("codex-fence rattle (dry-run)"),
+        stdout.contains("probe target (dry-run)"),
         "list-only output should include the dry-run banner"
     );
     assert!(
@@ -599,20 +638,20 @@ fn fence_rattle_list_only_reports_plan() -> Result<()> {
 
 // Error handling: unknown probe id should surface a descriptive failure.
 #[test]
-fn fence_rattle_errors_on_unknown_probe() -> Result<()> {
+fn probe_target_errors_on_unknown_probe() -> Result<()> {
     let repo_root = repo_root();
-    let rattle = helper_binary(&repo_root, "fence-rattle");
-    let output = Command::new(&rattle)
+    let target_runner = helper_binary(&repo_root, "probe-target");
+    let output = Command::new(&target_runner)
         .arg("--probe")
         .arg("does_not_exist")
         .arg("--mode")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute fence-rattle unknown probe")?;
+        .context("failed to execute probe-target unknown probe")?;
     assert!(
         !output.status.success(),
-        "fence-rattle should fail for unknown probe ids"
+        "probe-target should fail for unknown probe ids"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -624,20 +663,20 @@ fn fence_rattle_errors_on_unknown_probe() -> Result<()> {
 
 // Error handling: unknown capability should be rejected before execution.
 #[test]
-fn fence_rattle_errors_on_unknown_capability() -> Result<()> {
+fn probe_target_errors_on_unknown_capability() -> Result<()> {
     let repo_root = repo_root();
-    let rattle = helper_binary(&repo_root, "fence-rattle");
-    let output = Command::new(&rattle)
+    let target_runner = helper_binary(&repo_root, "probe-target");
+    let output = Command::new(&target_runner)
         .arg("--cap")
         .arg("cap_does_not_exist")
         .arg("--mode")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute fence-rattle unknown capability")?;
+        .context("failed to execute probe-target unknown capability")?;
     assert!(
         !output.status.success(),
-        "fence-rattle should fail for unknown capabilities"
+        "probe-target should fail for unknown capabilities"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -649,19 +688,19 @@ fn fence_rattle_errors_on_unknown_capability() -> Result<()> {
 
 // Validation: a selector is required, and providing both should error.
 #[test]
-fn fence_rattle_selector_validation() -> Result<()> {
+fn probe_target_selector_validation() -> Result<()> {
     let repo_root = repo_root();
-    let rattle = helper_binary(&repo_root, "fence-rattle");
+    let target_runner = helper_binary(&repo_root, "probe-target");
 
-    let missing = Command::new(&rattle)
+    let missing = Command::new(&target_runner)
         .arg("--mode")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute fence-rattle without selector")?;
+        .context("failed to execute probe-target without selector")?;
     assert!(
         !missing.status.success(),
-        "--rattle should fail when --cap/--probe are both absent"
+        "--target should fail when --cap/--probe are both absent"
     );
     let missing_err = String::from_utf8_lossy(&missing.stderr);
     assert!(
@@ -669,17 +708,17 @@ fn fence_rattle_selector_validation() -> Result<()> {
         "missing-selector error should mention required flags; stderr: {missing_err}"
     );
 
-    let both = Command::new(&rattle)
+    let both = Command::new(&target_runner)
         .arg("--cap")
         .arg("cap_fs_read_workspace_tree")
         .arg("--probe")
         .arg("fs_read_workspace_readme")
-        .env("CODEX_FENCE_PREFER_TARGET", "1")
+        .env("FENCE_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute fence-rattle with conflicting selectors")?;
+        .context("failed to execute probe-target with conflicting selectors")?;
     assert!(
         !both.status.success(),
-        "--rattle should fail when both --cap and --probe are provided"
+        "--target should fail when both --cap and --probe are provided"
     );
     let both_err = String::from_utf8_lossy(&both.stderr);
     assert!(
@@ -723,7 +762,7 @@ emit_record_bin="${repo_root}/bin/emit-record"
 probe_name="tests_static_contract_broken"
 primary_capability_id="cap_fs_read_workspace_tree"
 "${emit_record_bin}" \
-  --run-mode "${FENCE_RUN_MODE:-baseline}" \
+  --run-mode "${FENCE_RUN_MODE:-${FENCE_RUN_MODE:-baseline}}" \
   --probe-name "${probe_name}" \
   --probe-version "1" \
   --primary-capability-id "${primary_capability_id}" \
@@ -774,7 +813,7 @@ fn dynamic_probe_contract_accepts_fixture() -> Result<()> {
         .arg(fixture.probe_id())
         .arg("--modes")
         .arg("baseline")
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = cmd
         .output()
         .context("failed to execute dynamic probe contract")?;
@@ -938,15 +977,15 @@ exit 0
     Ok(())
 }
 
-// Runs the `fence-test` binary so `cargo test` fails whenever the full
-// contract gate rejects any checked-in probe.
+// Runs the `probe-gate` binary so `cargo test` fails whenever the static
+// contract gate over the full probe set rejects any checked-in probe.
 #[test]
-fn fence_test_contract_gate_succeeds() -> Result<()> {
+fn probe_test_contract_gate_succeeds() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
-    let fence_test = helper_binary(&repo_root, "fence-test");
+    let probe_test = helper_binary(&repo_root, "probe-gate");
 
-    let mut cmd = Command::new(fence_test);
+    let mut cmd = Command::new(probe_test);
     cmd.current_dir(&repo_root);
     run_command(cmd)?;
 
@@ -960,11 +999,48 @@ fn resolve_helper_prefers_release() -> Result<()> {
     let temp = TempRepo::new();
     let release_dir = temp.root.join("target/release");
     fs::create_dir_all(&release_dir)?;
-    let helper = release_dir.join("fence-run");
+    let helper = release_dir.join("probe-exec");
     fs::write(&helper, "#!/bin/sh\n")?;
     make_executable(&helper)?;
-    let resolved = resolve_helper_binary(&temp.root, "fence-run")?;
+    let resolved = resolve_helper_binary(&temp.root, "probe-exec")?;
     assert_eq!(resolved, helper);
+    Ok(())
+}
+
+#[test]
+fn bin_helpers_match_manifest() -> Result<()> {
+    let repo_root = repo_root();
+    let manifest_path = repo_root.join("tools/helpers.manifest.json");
+    let manifest: Vec<serde_json::Value> = serde_json::from_reader(File::open(&manifest_path)?)?;
+    let mut registered: Vec<String> = manifest
+        .into_iter()
+        .filter_map(|v| {
+            v.get("name")
+                .and_then(|n| n.as_str())
+                .map(|s| s.to_string())
+        })
+        .collect();
+    registered.sort();
+
+    let mut present = Vec::new();
+    for entry in fs::read_dir(repo_root.join("bin"))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if name == ".gitkeep" {
+            continue;
+        }
+        let name_str = name.to_string_lossy().to_string();
+        if name_str == "probe-contract-gate" {
+            continue;
+        }
+        present.push(name_str);
+    }
+    present.sort();
+
+    assert_eq!(
+        registered, present,
+        "bin/ helpers must match tools/helpers.manifest.json"
+    );
     Ok(())
 }
 
@@ -996,7 +1072,7 @@ fn paging_stress_runs_small_workload() -> Result<()> {
         "--max-seconds",
         "2",
     ])
-    .env("CODEX_FENCE_PREFER_TARGET", "1");
+    .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     assert!(
         output.stdout.is_empty(),
@@ -1012,7 +1088,7 @@ fn paging_stress_rejects_invalid_arguments() -> Result<()> {
 
     let mut cmd = Command::new(&helper);
     cmd.args(["--megabytes", "0"])
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = cmd
         .output()
         .context("failed to execute paging-stress with invalid args")?;
@@ -1023,16 +1099,22 @@ fn paging_stress_rejects_invalid_arguments() -> Result<()> {
 
 #[test]
 #[cfg(unix)]
-fn codex_present_requires_executable() -> Result<()> {
+fn external_cli_present_requires_executable() -> Result<()> {
     let temp = TempRepo::new();
     let codex_bin = temp.root.join("codex");
     fs::write(&codex_bin, "#!/bin/sh\nexit 0\n")?;
 
     let _guard = PathGuard::set(&temp.root);
-    assert!(!codex_present(), "non-executable binary should be ignored");
+    assert!(
+        !external_cli_present(),
+        "non-executable binary should be ignored"
+    );
 
     make_executable(&codex_bin)?;
-    assert!(codex_present(), "executable codex should be detected");
+    assert!(
+        external_cli_present(),
+        "executable external runner should be detected"
+    );
     Ok(())
 }
 
@@ -1062,10 +1144,10 @@ fn boundary_object_round_trips_structs() -> Result<()> {
     let value = serde_json::to_value(&bo)?;
     assert_eq!(
         value.get("schema_version").and_then(|v| v.as_str()),
-        Some("cfbo-v1")
+        Some(boundary_schema_version().as_str())
     );
     let back: BoundaryObject = serde_json::from_value(value)?;
-    assert_eq!(back.schema_version, "cfbo-v1");
+    assert_eq!(back.schema_version, boundary_schema_version());
     assert_eq!(back.run.mode, "baseline");
     assert_eq!(back.capability_context.primary.id.0, "cap_id");
     Ok(())
@@ -1074,13 +1156,13 @@ fn boundary_object_round_trips_structs() -> Result<()> {
 #[test]
 fn capabilities_schema_version_serializes_in_json() -> Result<()> {
     let mut bo = sample_boundary_object();
-    bo.capabilities_schema_version = Some(CatalogKey("macOS_codex_v1".to_string()));
+    bo.capabilities_schema_version = Some(default_catalog_key());
     let value = serde_json::to_value(&bo)?;
     assert_eq!(
         value
             .get("capabilities_schema_version")
             .and_then(|v| v.as_str()),
-        Some("macOS_codex_v1")
+        Some(default_catalog_key().0.as_str())
     );
     Ok(())
 }
@@ -1088,7 +1170,7 @@ fn capabilities_schema_version_serializes_in_json() -> Result<()> {
 #[test]
 fn repository_lookup_context_matches_capabilities() -> Result<()> {
     let catalog = load_catalog_from_path(&catalog_path())?;
-    let key = catalog.key.clone();
+    let key = catalog.catalog.key.clone();
     let primary = catalog.capabilities.first().expect("cap present");
     let secondary = catalog
         .capabilities
@@ -1198,9 +1280,9 @@ fn snapshot_serde_matches_schema() -> Result<()> {
 
 #[test]
 fn catalog_key_and_id_round_trip() {
-    let key = CatalogKey("macOS_codex_v1".to_string());
+    let key = default_catalog_key();
     let serialized = serde_json::to_string(&key).unwrap();
-    assert_eq!(serialized, "\"macOS_codex_v1\"");
+    assert_eq!(serialized, format!("\"{}\"", key.0));
     let parsed: CatalogKey = serde_json::from_str(&serialized).unwrap();
     assert_eq!(parsed, key);
 
@@ -1214,7 +1296,7 @@ fn catalog_key_and_id_round_trip() {
 #[test]
 fn load_real_catalog_smoke() -> Result<()> {
     let catalog = load_catalog_from_path(&catalog_path())?;
-    assert!(!catalog.key.0.is_empty());
+    assert!(!catalog.catalog.key.0.is_empty());
     assert!(!catalog.capabilities.is_empty());
     for cap in catalog.capabilities {
         assert!(!cap.id.0.is_empty());
@@ -1233,7 +1315,7 @@ fn load_real_catalog_smoke() -> Result<()> {
 #[test]
 fn finds_capability_in_registered_catalog() -> Result<()> {
     let catalog = load_catalog_from_path(&catalog_path())?;
-    let key = catalog.key.clone();
+    let key = catalog.catalog.key.clone();
     let known_capability = catalog
         .capabilities
         .first()
@@ -1306,6 +1388,40 @@ fn capability_index_enforces_schema_version() -> Result<()> {
         }),
     )?;
     assert!(CapabilityIndex::load(file.path()).is_err());
+    Ok(())
+}
+
+#[test]
+fn capability_index_accepts_allowed_schema_version_override() -> Result<()> {
+    let mut temp = NamedTempFile::new()?;
+    serde_json::to_writer(
+        &mut temp,
+        &json!({
+            "schema_version": "custom_catalog_v1",
+            "catalog": {"key": "custom_catalog_v1", "title": "custom catalog"},
+            "scope": {
+                "description": "test",
+                "policy_layers": [{"id": "os_sandbox", "description": "fixture layer"}],
+                "categories": {"filesystem": "fixture"}
+            },
+            "docs": {},
+            "capabilities": [{
+                "id": "cap_fs_custom",
+                "category": "filesystem",
+                "layer": "os_sandbox",
+                "description": "cap fs",
+                "operations": {"allow": [], "deny": []}
+            }]
+        }),
+    )?;
+
+    let guard = EnvGuard::new(
+        "FENCE_ALLOWED_CATALOG_SCHEMAS",
+        Some("custom_catalog_v1,sandbox_catalog_v1"),
+    );
+    let index = CapabilityIndex::load(temp.path())?;
+    drop(guard);
+    assert_eq!(index.key().0, "custom_catalog_v1");
     Ok(())
 }
 
@@ -1473,7 +1589,7 @@ fn payload_builder_accepts_inline_snippets() -> Result<()> {
     Ok(())
 }
 
-// === fence-run workspace helpers ===
+// === probe-exec workspace helpers ===
 
 #[test]
 fn resolve_probe_prefers_probes_dir() -> Result<()> {
@@ -1597,7 +1713,7 @@ fn classify_preflight_defaults_to_error() {
 }
 
 #[test]
-fn fence_run_emits_preflight_record_on_codex_denial() -> Result<()> {
+fn probe_run_emits_preflight_record_on_codex_denial() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
@@ -1617,10 +1733,10 @@ exit 71
     )?;
     let _path_guard = PathGuard::set_os(combined_path);
 
-    let mut cmd = Command::new(helper_binary(&repo_root, "fence-run"));
+    let mut cmd = Command::new(helper_binary(&repo_root, "probe-exec"));
     cmd.arg("codex-sandbox")
         .arg(fixture.probe_id())
-        .env("CODEX_FENCE_PREFER_TARGET", "1");
+        .env("FENCE_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let (record, value) = parse_boundary_object(&output.stdout)?;
 
@@ -1634,7 +1750,7 @@ exit 71
         value
             .pointer("/payload/raw/preflight_kind")
             .and_then(Value::as_str),
-        Some("codex_tmp")
+        Some("external_tmp")
     );
     Ok(())
 }
@@ -1642,7 +1758,7 @@ exit 71
 // === CLI helper smoke tests (former bin_smoke) ===
 
 #[test]
-fn codex_fence_prefers_repo_helper() -> Result<()> {
+fn probe_prefers_repo_helper() -> Result<()> {
     let repo_root = repo_root();
     let temp_repo = TempDir::new().context("failed to allocate temp repo")?;
     let repo = temp_repo.path();
@@ -1652,21 +1768,21 @@ fn codex_fence_prefers_repo_helper() -> Result<()> {
     fs::write(repo.join("Makefile"), "all:\n\t@true\n")?;
 
     let marker = repo.join("helper_invoked");
-    let helper_path = bin_dir.join("fence-bang");
+    let helper_path = bin_dir.join("probe-matrix");
     fs::write(
         &helper_path,
         "#!/bin/sh\n[ -n \"$MARK_FILE\" ] && echo invoked > \"$MARK_FILE\"\n",
     )?;
     make_executable(&helper_path)?;
 
-    let codex_fence = helper_binary(&repo_root, "codex-fence");
-    let output = Command::new(codex_fence)
-        .arg("--bang")
-        .env("CODEX_FENCE_ROOT", repo)
+    let probe = helper_binary(&repo_root, "probe");
+    let output = Command::new(probe)
+        .arg("--matrix")
+        .env("FENCE_ROOT", repo)
         .env("PATH", "")
         .env("MARK_FILE", &marker)
         .output()
-        .context("failed to run codex-fence stub")?;
+        .context("failed to run probe stub")?;
 
     assert!(output.status.success());
     assert!(marker.is_file());
@@ -1674,31 +1790,31 @@ fn codex_fence_prefers_repo_helper() -> Result<()> {
 }
 
 #[test]
-fn codex_fence_falls_back_to_path() -> Result<()> {
+fn probe_falls_back_to_path() -> Result<()> {
     let repo_root = repo_root();
     let temp = TempDir::new().context("failed to allocate temp dir")?;
     let helper_dir = temp.path();
     let marker = helper_dir.join("path_helper_invoked");
-    let helper_path = helper_dir.join("fence-listen");
+    let helper_path = helper_dir.join("probe-listen");
     fs::write(
         &helper_path,
         "#!/bin/sh\n[ -n \"$MARK_FILE\" ] && echo listen > \"$MARK_FILE\"\n",
     )?;
     make_executable(&helper_path)?;
 
-    let source = helper_binary(&repo_root, "codex-fence");
-    let runner = helper_dir.join("codex-fence");
+    let source = helper_binary(&repo_root, "probe");
+    let runner = helper_dir.join("probe");
     fs::copy(&source, &runner)?;
     make_executable(&runner)?;
 
     let output = Command::new(&runner)
         .arg("--listen")
         .env("PATH", helper_dir)
-        .env_remove("CODEX_FENCE_ROOT")
+        .env_remove("FENCE_ROOT")
         .env("MARK_FILE", &marker)
         .current_dir(helper_dir)
         .output()
-        .context("failed to run codex-fence path test")?;
+        .context("failed to run probe path test")?;
 
     assert!(output.status.success());
     assert!(marker.is_file());
@@ -1706,7 +1822,7 @@ fn codex_fence_falls_back_to_path() -> Result<()> {
 }
 
 #[test]
-fn codex_fence_exports_root_to_helpers() -> Result<()> {
+fn probe_exports_root_to_helpers() -> Result<()> {
     let repo_root = repo_root();
     let temp_repo = TempDir::new().context("failed to allocate temp repo")?;
     let repo = temp_repo.path();
@@ -1716,21 +1832,21 @@ fn codex_fence_exports_root_to_helpers() -> Result<()> {
     fs::write(repo.join("Makefile"), "all:\n\t@true\n")?;
 
     let marker = repo.join("root_seen");
-    let helper_path = bin_dir.join("fence-bang");
+    let helper_path = bin_dir.join("probe-matrix");
     fs::write(
         &helper_path,
-        "#!/bin/sh\n[ -n \"$CODEX_FENCE_ROOT\" ] && echo \"$CODEX_FENCE_ROOT\" > \"$MARK_FILE\"\n",
+        "#!/bin/sh\n[ -n \"$FENCE_ROOT\" ] && echo \"$FENCE_ROOT\" > \"$MARK_FILE\"\n",
     )?;
     make_executable(&helper_path)?;
 
-    let codex_fence = helper_binary(&repo_root, "codex-fence");
-    let output = Command::new(codex_fence)
-        .arg("--bang")
-        .env("CODEX_FENCE_ROOT", repo)
+    let probe = helper_binary(&repo_root, "probe");
+    let output = Command::new(probe)
+        .arg("--matrix")
+        .env("FENCE_ROOT", repo)
         .env("PATH", "")
         .env("MARK_FILE", &marker)
         .output()
-        .context("failed to run codex-fence env propagation test")?;
+        .context("failed to run probe env propagation test")?;
 
     assert!(output.status.success());
     let recorded = fs::read_to_string(&marker).context("marker missing")?;
@@ -2025,7 +2141,7 @@ impl TempRepo {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let mut dir = env::temp_dir();
         dir.push(format!(
-            "codex-fence-helper-test-{}-{}",
+            "probe-helper-test-{}-{}",
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
@@ -2050,7 +2166,7 @@ impl TempWorkspace {
         let mut base = env::temp_dir();
         let unique = COUNTER.fetch_add(1, Ordering::SeqCst);
         base.push(format!(
-            "codex-fence-test-{}-{}",
+            "probe-workspace-test-{}-{}",
             std::process::id(),
             unique
         ));
@@ -2098,6 +2214,37 @@ impl Drop for PathGuard {
     }
 }
 
+struct EnvGuard {
+    key: &'static str,
+    previous: Option<Option<String>>,
+}
+
+impl EnvGuard {
+    fn new(key: &'static str, value: Option<&str>) -> Self {
+        let previous = match env::var(key) {
+            Ok(v) => Some(Some(v)),
+            Err(env::VarError::NotPresent) => Some(None),
+            Err(env::VarError::NotUnicode(_)) => None,
+        };
+        match value {
+            Some(v) => unsafe { env::set_var(key, v) },
+            None => unsafe { env::remove_var(key) },
+        }
+        Self { key, previous }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        if let Some(prev) = self.previous.take() {
+            match prev {
+                Some(val) => unsafe { env::set_var(self.key, val) },
+                None => unsafe { env::remove_var(self.key) },
+            }
+        }
+    }
+}
+
 fn sample_capability_index(entries: &[(&str, &str, &str)]) -> Result<CapabilityIndex> {
     let mut file = NamedTempFile::new()?;
     let capabilities: Vec<Value> = entries
@@ -2112,11 +2259,26 @@ fn sample_capability_index(entries: &[(&str, &str, &str)]) -> Result<CapabilityI
             })
         })
         .collect();
+
+    let mut categories = BTreeMap::new();
+    let mut layers = BTreeSet::new();
+    for (_, category, layer) in entries {
+        categories
+            .entry(category.to_string())
+            .or_insert_with(|| "fixture".to_string());
+        layers.insert(layer.to_string());
+    }
+    let policy_layers: Vec<Value> = layers
+        .into_iter()
+        .map(|layer| json!({"id": layer, "description": "fixture layer"}))
+        .collect();
+
     serde_json::to_writer(
         &mut file,
         &json!({
-            "schema_version": "macOS_codex_v1",
-            "scope": {"description": "test", "policy_layers": [], "categories": {}},
+            "schema_version": "sandbox_catalog_v1",
+            "catalog": {"key": "sample_catalog_v1", "title": "sample catalog"},
+            "scope": {"description": "test", "policy_layers": policy_layers, "categories": categories},
             "docs": {},
             "capabilities": capabilities
         }),
@@ -2126,7 +2288,32 @@ fn sample_capability_index(entries: &[(&str, &str, &str)]) -> Result<CapabilityI
 }
 
 fn catalog_path() -> PathBuf {
-    repo_root().join("schema").join("capabilities.json")
+    repo_root().join(DEFAULT_CATALOG_PATH)
+}
+
+fn default_catalog_key() -> CatalogKey {
+    static KEY: OnceLock<CatalogKey> = OnceLock::new();
+    KEY.get_or_init(|| {
+        load_catalog_from_path(&catalog_path())
+            .expect("load catalog")
+            .catalog
+            .key
+            .clone()
+    })
+    .clone()
+}
+
+fn boundary_schema_version() -> String {
+    static VERSION: OnceLock<String> = OnceLock::new();
+    VERSION
+        .get_or_init(|| {
+            let path = repo_root().join(DEFAULT_BOUNDARY_SCHEMA_PATH);
+            BoundarySchema::load(&path)
+                .expect("load boundary schema")
+                .schema_version()
+                .to_string()
+        })
+        .clone()
 }
 
 fn empty_json_object() -> Value {
@@ -2135,11 +2322,11 @@ fn empty_json_object() -> Value {
 
 fn sample_boundary_object() -> BoundaryObject {
     BoundaryObject {
-        schema_version: "cfbo-v1".to_string(),
-        capabilities_schema_version: None,
+        schema_version: boundary_schema_version(),
+        capabilities_schema_version: Some(default_catalog_key()),
         stack: StackInfo {
-            codex_cli_version: Some("1.0".to_string()),
-            codex_profile: None,
+            external_cli_version: Some("1.0".to_string()),
+            external_profile: None,
             sandbox_mode: Some("workspace-write".to_string()),
             os: "Darwin".to_string(),
         },

@@ -1,37 +1,19 @@
-# codex-fence Makefile -- orchestrates probe runs, tests, and metadata checks.
-# Targets are intentionally thin wrappers so the harness stays portable.
+# probe Makefile -- single entry points for builds and tests.
 
-# Force GNU Make to run every recipe with the baseline shell we test against.
 SHELL := /bin/bash
 CARGO ?= cargo
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/bin
 
-PROBE ?=
+.PHONY: build test clean-bin
 
-.PHONY: all probe install build-bin clean
+# Remove all generated helpers while preserving the repo root sentinel.
+clean-bin:
+	find bin -type f ! -name '.gitkeep' -delete
 
-# Default invocation currently acts as a lightweight reminder of available targets.
-all:
-	@printf "Available targets: build-bin, install, probe (requires PROBE=<id>).\n"
-
-# Fast loop for a single probe. Requires PROBE=<probe_id_or_path>.
-probe:
-	@if [[ -z "$(PROBE)" ]]; then \
-		echo "Usage: make probe PROBE=<probe_id_or_path>"; \
-		exit 1; \
-	fi
-	tools/validate_contract_gate.sh --probe "$(PROBE)"
-
-build-bin:
-# Refresh the repo-local helper binaries built from src/bin/.
+# Rebuild and resync every helper binary into bin/.
+build: clean-bin
+	$(CARGO) clean -p fencerunner
 	tools/sync_bin_helpers.sh
 
-# Install the CLI + Rust helpers to $(BINDIR), building a release binary first.
-install: build-bin
-	install -d "$(BINDIR)"
-	install -m 755 bin/codex-fence "$(BINDIR)/codex-fence"
-
-# Remove any probe scratch space locals keep in tmp/.
-clean:
-	rm -rf tmp/
+# Always run tests against freshly rebuilt helpers.
+test: build
+	$(CARGO) test --test suite

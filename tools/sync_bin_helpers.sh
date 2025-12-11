@@ -1,33 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Synchronize compiled Rust helpers into bin/ so callers can rely on a
-# stable location that does not depend on target/{debug,release}. This is a thin
+# Synchronize compiled Rust helpers into bin/ so callers can rely on a stable
+# location that does not depend on target/{debug,release}. This is a thin
 # wrapper around `cargo build --release --bins` with the repository root wired
-# into CODEX_FENCE_ROOT_HINT.
+# into FENCE_ROOT_HINT. Helper membership is governed by tools/helpers.manifest.json;
+# add new helpers there when extending the toolchain.
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 bin_dir="${repo_root}/bin"
+manifest="${repo_root}/tools/helpers.manifest.json"
 
-CARGO_BINARIES=(
-  codex-fence
-  detect-stack
-  emit-record
-  fence-bang
-  fence-rattle
-  fence-listen
-  fence-run
-  fence-test
-  portable-path
-  json-extract
-  paging-stress
-)
+CARGO_BINARIES=()
+while IFS= read -r name; do
+  CARGO_BINARIES+=("${name}")
+done < <(jq -r '.[].name' "${manifest}")
 
 CARGO=${CARGO:-cargo}
 BUILD_FLAGS=(--release --bins)
 
-CODEX_FENCE_ROOT_HINT="${repo_root}" "${CARGO}" build "${BUILD_FLAGS[@]}" "$@"
+FENCE_ROOT_HINT="${repo_root}" "${CARGO}" build "${BUILD_FLAGS[@]}" "$@"
 
 mkdir -p "${bin_dir}"
 for binary in "${CARGO_BINARIES[@]}"; do
@@ -41,3 +34,23 @@ for binary in "${CARGO_BINARIES[@]}"; do
 done
 
 echo "Rust helpers synchronized to ${bin_dir}"
+
+# Recreate the probe-contract-gate wrapper so contract tooling is always present.
+cat > "${bin_dir}/probe-contract-gate" <<'WRAPPER'
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)
+exec "${repo_root}/tools/validate_contract_gate.sh" "$@"
+WRAPPER
+chmod 755 "${bin_dir}/probe-contract-gate"
+
+# Validate manifest matches bin contents to catch unregistered helpers.
+registered="$(jq -r '.[].name' "${manifest}" | sort)"
+current="$(find "${bin_dir}" -maxdepth 1 -type f ! -name '.gitkeep' ! -name 'probe-contract-gate' -print0 | xargs -0 -n1 basename | sort)"
+if [[ "${registered}" != "${current}" ]]; then
+  echo "sync_bin_helpers: helper manifest mismatch" >&2
+  echo "  registered: ${registered}" >&2
+  echo "  in bin/:    ${current}" >&2
+  exit 1
+fi

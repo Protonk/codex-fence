@@ -31,6 +31,6 @@ probe itself if/when we add such modes.
 
 ## Building
 
-`make build-bin` (or `tools/sync_bin_helpers.sh`) builds the helper via Cargo
+`make build` (or `tools/sync_bin_helpers.sh`) builds the helper via Cargo
 and syncs it into `bin/paging-stress`. You can also run it directly with
 `cargo run --bin paging-stress -- --megabytes 4 --passes 1`.

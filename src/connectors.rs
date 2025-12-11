@@ -1,12 +1,13 @@
 //! Connector registry for run modes.
 //!
-//! This module centralizes how run modes map to connectors (Codex vs. ambient
-//! baseline), sandbox defaults, command planning, and optional preflight hooks.
-//! Binaries should rely on this registry instead of hard-coding mode strings
-//! so new connectors can be added in one place without changing public CLI
-//! flags.
+//! This module centralizes how run modes map to connectors (ambient vs
+//! external CLI), sandbox defaults, command planning, and optional preflight
+//! hooks. Binaries should rely on this registry instead of hard-coding mode
+//! strings so new connectors can be added in one place without changing public
+//! CLI flags or drifting from the `run.mode` contract in the boundary-object
+//! schema and `docs/probes.md`.
 
-use crate::codex_present;
+use crate::{external_cli_command, external_cli_present};
 use anyhow::{Result, bail};
 use std::env;
 use std::env::VarError;
@@ -16,7 +17,7 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnectorKind {
     Ambient,
-    Codex,
+    ExternalCli,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,13 +38,13 @@ impl RunMode {
 
     pub fn connector(&self) -> ConnectorKind {
         match self {
-            RunMode::Baseline => ConnectorKind::Ambient,
-            RunMode::CodexSandbox | RunMode::CodexFull => ConnectorKind::Codex,
+            RunMode::Baseline | RunMode::CodexFull => ConnectorKind::Ambient,
+            RunMode::CodexSandbox => ConnectorKind::ExternalCli,
         }
     }
 
-    pub fn is_codex(&self) -> bool {
-        matches!(self.connector(), ConnectorKind::Codex)
+    pub fn is_external(&self) -> bool {
+        matches!(self.connector(), ConnectorKind::ExternalCli)
     }
 
     pub fn sandbox_env(&self, override_value: Option<String>) -> OsString {
@@ -71,7 +72,7 @@ impl RunMode {
 
     fn platform_target(&self, platform: &str) -> Result<Option<String>> {
         match self {
-            RunMode::CodexSandbox => Ok(Some(codex_platform_target(platform)?.to_string())),
+            RunMode::CodexSandbox => Ok(Some(external_platform_target(platform)?.to_string())),
             RunMode::Baseline | RunMode::CodexFull => Ok(None),
         }
     }
@@ -79,7 +80,7 @@ impl RunMode {
     fn ensure_connector_present(&self) -> Result<()> {
         match self.connector() {
             ConnectorKind::Ambient => Ok(()),
-            ConnectorKind::Codex => ensure_codex_available(),
+            ConnectorKind::ExternalCli => ensure_external_available(),
         }
     }
 
@@ -89,6 +90,7 @@ impl RunMode {
         probe_path: &Path,
     ) -> Result<CommandSpec> {
         let probe_arg = probe_path.as_os_str().to_os_string();
+        let external_cli = external_cli_command();
         match self {
             RunMode::Baseline | RunMode::CodexFull => Ok(CommandSpec {
                 program: probe_arg,
@@ -96,9 +98,9 @@ impl RunMode {
             }),
             RunMode::CodexSandbox => {
                 let target = platform_target
-                    .ok_or_else(|| anyhow::anyhow!("missing codex platform target"))?;
+                    .ok_or_else(|| anyhow::anyhow!("missing external platform target"))?;
                 Ok(CommandSpec {
-                    program: OsString::from("codex"),
+                    program: external_cli,
                     args: vec![
                         OsString::from("sandbox"),
                         OsString::from(target),
@@ -113,9 +115,9 @@ impl RunMode {
 
     fn preflight_plan(&self, platform_target: Option<&str>) -> Result<Option<PreflightPlan>> {
         match self {
-            RunMode::CodexSandbox => Ok(Some(PreflightPlan::CodexTmp {
+            RunMode::CodexSandbox => Ok(Some(PreflightPlan::ExternalTmp {
                 platform_target: platform_target
-                    .ok_or_else(|| anyhow::anyhow!("missing codex platform target"))?
+                    .ok_or_else(|| anyhow::anyhow!("missing external platform target"))?
                     .to_string(),
             })),
             RunMode::Baseline | RunMode::CodexFull => Ok(None),
@@ -169,7 +171,7 @@ pub fn plan_for_mode(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreflightPlan {
-    CodexTmp { platform_target: String },
+    ExternalTmp { platform_target: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,13 +182,13 @@ pub struct CommandSpec {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Availability {
-    pub codex_present: bool,
+    pub external_cli_present: bool,
 }
 
 impl Availability {
     pub fn for_host() -> Self {
         Self {
-            codex_present: codex_present(),
+            external_cli_present: external_cli_present(),
         }
     }
 }
@@ -222,20 +224,22 @@ pub fn sandbox_override_from_env() -> Option<String> {
     }
 }
 
-fn codex_platform_target(platform: &str) -> Result<&'static str> {
+fn external_platform_target(platform: &str) -> Result<&'static str> {
     match platform {
         "Darwin" => Ok("macos"),
         "Linux" => Ok("linux"),
-        other => bail!("Unsupported platform for codex-sandbox: {other}"),
+        other => bail!("Unsupported platform for external sandbox mode: {other}"),
     }
 }
 
-fn ensure_codex_available() -> Result<()> {
-    if codex_present() {
+fn ensure_external_available() -> Result<()> {
+    if external_cli_present() {
         return Ok(());
     }
+    let runner = external_cli_command();
     bail!(
-        "codex CLI not found; codex-* modes require codex. Install codex or run baseline instead."
+        "external CLI '{runner}' not found; codex-* modes require the configured external runner. Install codex (or override the runner) or run baseline instead.",
+        runner = runner.to_string_lossy()
     )
 }
 
@@ -243,8 +247,8 @@ fn always_available(_: &Availability) -> bool {
     true
 }
 
-fn codex_available(availability: &Availability) -> bool {
-    availability.codex_present
+fn external_available(availability: &Availability) -> bool {
+    availability.external_cli_present
 }
 
 struct ModeSpec {
@@ -258,12 +262,12 @@ const MODE_SPECS: &[ModeSpec] = &[
         default_gate: always_available,
     },
     ModeSpec {
-        run_mode: RunMode::CodexSandbox,
-        default_gate: codex_available,
+        run_mode: RunMode::CodexFull,
+        default_gate: always_available,
     },
     ModeSpec {
-        run_mode: RunMode::CodexFull,
-        default_gate: codex_available,
+        run_mode: RunMode::CodexSandbox,
+        default_gate: external_available,
     },
 ];
 
@@ -273,24 +277,24 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn defaults_gate_on_codex_availability() {
-        let without_codex = Availability {
-            codex_present: false,
+    fn defaults_gate_on_external_availability() {
+        let without_external = Availability {
+            external_cli_present: false,
         };
-        let with_codex = Availability {
-            codex_present: true,
+        let with_external = Availability {
+            external_cli_present: true,
         };
 
         assert_eq!(
-            default_mode_names(without_codex),
-            vec!["baseline".to_string()]
+            default_mode_names(without_external),
+            vec!["baseline".to_string(), "codex-full".to_string()]
         );
         assert_eq!(
-            default_mode_names(with_codex),
+            default_mode_names(with_external),
             vec![
                 "baseline".to_string(),
+                "codex-full".to_string(),
                 "codex-sandbox".to_string(),
-                "codex-full".to_string()
             ]
         );
     }
@@ -300,7 +304,7 @@ mod tests {
         let baseline = RunMode::try_from("baseline").expect("baseline parses");
         assert_eq!(baseline.as_str(), "baseline");
         let codex_full = RunMode::try_from("codex-full").expect("codex-full parses");
-        assert!(codex_full.is_codex());
+        assert!(!codex_full.is_external());
         assert!(RunMode::try_from("unknown-mode").is_err());
     }
 

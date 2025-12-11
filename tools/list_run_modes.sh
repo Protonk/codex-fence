@@ -4,15 +4,16 @@
 #
 # Goals:
 # - Keep contract gate mode coverage aligned with the modes the harness cares
-#   about (baseline, codex-sandbox, codex-full).
+#   about (baseline, codex-full, codex-sandbox).
 # - Allow overrides via PROBE_CONTRACT_MODES for tests or rapid experiments.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
-codex_fence_run_modes() {
-  local modes=("baseline")
-  if command -v codex >/dev/null 2>&1; then
-    modes+=("codex-sandbox" "codex-full")
+external_cli_run_modes() {
+  local modes=("baseline" "codex-full")
+  local external_cli="${FENCE_EXTERNAL_CLI:-${CODEX_CLI:-codex}}"
+  if command -v "${external_cli}" >/dev/null 2>&1; then
+    modes+=("codex-sandbox")
   fi
   printf '%s\n' "${modes[@]}"
 }
@@ -23,5 +24,5 @@ contract_gate_modes() {
     printf '%s' "${override}" | tr ',' ' ' | tr -s ' ' '\n' | sed '/^[[:space:]]*$/d'
     return 0
   fi
-  codex_fence_run_modes
+  external_cli_run_modes
 }

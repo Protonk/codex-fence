@@ -1,10 +1,10 @@
 # docs/AGENTS.md
 
-This directory contains human-readable explanations of the *contracts* that `codex-fence` enforces elsewhere in the repo. It is here to help both humans and model-based agents understand how to interpret:
+This directory contains human-readable explanations of the *contracts* that `probe` enforces elsewhere in the repo. It is here to help both humans and model-based agents understand how to interpret:
 
-- the capability catalog (`capabilities.json`)
+- the capability catalog schema + bundled catalog (`schema/capability_catalog.schema.json`, `catalogs/*.json`)
 - probe scripts (`probes/*.sh`)
-- probe outputs (boundary objects streamed from `codex-fence --bang`)
+- probe outputs (boundary objects streamed from `probe --matrix`)
 
 The actual contracts are enforced by schemas, adapters, and tests. The documents in `docs/` must never become the primary source of truth about behavior or policy.
 
@@ -12,12 +12,13 @@ Use this file before you read or edit anything in `docs/`.
 
 ## What to know before reading these docs
 
-1. Start with the project root `README.md` if you need the big picture: why `codex-fence` exists, what a “probe” is, and how the harness runs.
+1. Start with the project root `README.md` if you need the big picture: why `probe` exists, what a “probe” is, and how the harness runs.
 2. Treat everything in `docs/` as *explanatory lenses* over:
-   - `capabilities.json` (capability map, versioned)
+   - `schema/capability_catalog.schema.json` + `catalogs/*.json` (capability map, versioned)
    - `schema/boundary_object.json` (boundary object schema)
    - the probe authoring contracts in `probes/AGENTS.md`
    - the test harness described in `tests/AGENTS.md`
+3. Helper binaries accept drop-in artifacts: use `--catalog` / `FENCE_CATALOG_PATH` (and `FENCE_ALLOWED_CATALOG_SCHEMAS` for testing new catalog schema versions) plus `--boundary-schema` / `FENCE_BOUNDARY_SCHEMA_PATH` to point at alternate schema files.
 3. When documentation and machine artifacts disagree, the machine artifacts win. Fix the docs to match the schema/tests, not the other way around.
 
 If you are a model-based agent: prefer reading the JSON schemas and `AGENTS.md` contracts in other directories when you need normative rules. Use these docs to understand structure and intent.
@@ -30,7 +31,7 @@ If you are a model-based agent: prefer reading the JSON schemas and `AGENTS.md` 
 
 **Role**
 
-Explains the structure and intent of `capabilities.json`:
+Explains the structure and intent of the capability catalog:
 
 - How the catalog is scoped (`scope`, `policy_layers`, `categories`).
 - What each capability entry contains (`description`, `operations`, `meta_ops`, `agent_controls`, `notes`, `sources`, etc.).
@@ -39,7 +40,7 @@ Explains the structure and intent of `capabilities.json`:
 **Read this if**
 
 - You want to understand what a “capability” means in this project.
-- You are adding or interpreting entries in `capabilities.json`.
+- You are adding or interpreting entries in the capability catalog.
 - You are writing probes and need to see how they’re expected to align with capabilities.
 
 ### `probes.md`
@@ -77,7 +78,7 @@ The machine-readable contract is `schema/boundary_object.json`, enforced by `bin
 
 **Read this if**
 
-- You are interpreting streamed boundary objects (e.g., from `codex-fence --bang`).
+- You are interpreting streamed boundary objects (e.g., from `probe --matrix`).
 - You are modifying `bin/emit-record` or any adapters that build boundary objects.
 - You are adding new consumers of boundary objects and need to know which fields are stable.
 
@@ -104,7 +105,7 @@ If you add a new document here:
    - Who should read it,
    - What invariants must be preserved when it changes.
 4. Avoid embedding new, untested “truths” about sandbox behavior here. If you discover new behavior:
-   - add or update a capability in `capabilities.json`,
+   - add or update a capability in `catalogs/*.json`,
    - write or update probes under `probes/`,
    - and extend tests to cover it.
 

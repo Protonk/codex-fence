@@ -1,12 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/Protonk/codex-fence/schema/boundary_object.json",
-  "title": "Codex Fence Boundary Object (cfbo-v1)",
-  "description": "Record of a single probe execution aligned with the current capability map (schema/capabilities.json schema_version=\"macOS_codex_v1\").",
+  "$id": "https://github.com/Protonk/fencerunner/schema/boundary_object.json",
+  "title": "Sandprobe Boundary Object (cfbo-v1)",
+  "description": "Record of a single probe execution aligned with the current capability catalog (catalog schema sandbox_catalog_v1, catalog key \"macOS_codex_v1\").",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "capabilities_schema_version",
     "stack",
     "probe",
     "run",
@@ -21,22 +22,34 @@
       "const": "cfbo-v1"
     },
     "capabilities_schema_version": {
-      "description": "The schema_version value from schema/capabilities.json used when interpreting capability ids (e.g., \"macOS_codex_v1\").",
-      "type": ["string", "null"],
+      "description": "The catalog key from the capability catalog used when interpreting capability ids (e.g., \"macOS_codex_v1\").",
+      "type": "string",
       "pattern": "^[A-Za-z0-9_.-]+$"
     },
     "stack": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "codex_cli_version",
-        "codex_profile",
-        "sandbox_mode",
-        "os"
+      "anyOf": [
+        { "required": ["external_cli_version", "external_profile", "sandbox_mode", "os"] },
+        { "required": ["codex_cli_version", "codex_profile", "sandbox_mode", "os"] }
       ],
       "properties": {
-        "codex_cli_version": { "type": ["string", "null"] },
-        "codex_profile": { "type": ["string", "null"] },
+        "external_cli_version": {
+          "type": ["string", "null"],
+          "description": "Version string for the configured external runner, if any (e.g., \"codex-cli 0.63.0\")."
+        },
+        "external_profile": {
+          "type": ["string", "null"],
+          "description": "Profile name or mode for the external runner, if known."
+        },
+        "codex_cli_version": {
+          "type": ["string", "null"],
+          "description": "Legacy alias for external_cli_version used by earlier fence builds."
+        },
+        "codex_profile": {
+          "type": ["string", "null"],
+          "description": "Legacy alias for external_profile used by earlier fence builds."
+        },
         "sandbox_mode": {
           "type": ["string", "null"],
           "enum": ["read-only", "workspace-write", "danger-full-access", null]
@@ -145,7 +158,7 @@
     },
     "capability_context": {
       "type": "object",
-      "description": "Snapshot of the primary and secondary capabilities as interpreted from capabilities.json v3 at the time of the run.",
+      "description": "Snapshot of the primary and secondary capabilities as interpreted from the active capability catalog at the time of the run.",
       "additionalProperties": false,
       "required": ["primary"],
       "properties": {
@@ -165,7 +178,7 @@
   "definitions": {
     "capability_snapshot": {
       "type": "object",
-      "description": "Minimal snapshot of a capability from capabilities.json v3 used by this probe.",
+      "description": "Minimal snapshot of a capability from the capability catalog used by this probe.",
       "additionalProperties": false,
       "required": ["id", "category", "layer"],
       "properties": {

@@ -17,7 +17,7 @@ pub struct CatalogRepository {
 impl CatalogRepository {
     /// Register a catalog for later lookup.
     pub fn register(&mut self, catalog: CapabilityCatalog) {
-        self.catalogs.insert(catalog.key.clone(), catalog);
+        self.catalogs.insert(catalog.catalog.key.clone(), catalog);
     }
 
     /// Fetch a catalog by key, if present.

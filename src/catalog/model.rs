@@ -1,4 +1,4 @@
-//! Deserializable representation of `schema/capabilities.json`.
+//! Deserializable representation of the bundled capability catalog.
 //!
 //! The types mirror the catalog schema so helpers and tests can reason about
 //! capability metadata without ad-hoc JSON handling. Use `CapabilityIndex` for
@@ -18,10 +18,24 @@ use std::path::Path;
 /// Full capability catalog as stored on disk.
 pub struct CapabilityCatalog {
     #[serde(rename = "schema_version")]
-    pub key: CatalogKey,
+    pub schema_version: String,
+    pub catalog: CatalogMetadata,
     pub scope: Scope,
     pub docs: BTreeMap<String, DocRef>,
     pub capabilities: Vec<Capability>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+/// Describes the catalog instance (environment/client labels, human title, and key).
+pub struct CatalogMetadata {
+    pub key: CatalogKey,
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -61,11 +75,15 @@ pub struct Capability {
     pub category: CapabilityCategory,
     pub layer: CapabilityLayer,
     pub description: String,
+    #[serde(default)]
+    pub status: Option<String>,
     pub operations: Operations,
     #[serde(default)]
     pub meta_ops: Vec<String>,
     #[serde(default)]
     pub agent_controls: Vec<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
     #[serde(default)]
     pub notes: Option<String>,
     #[serde(default)]

@@ -234,7 +234,7 @@ pub fn validate_capability_id(
         return Ok(());
     }
     bail!(
-        "Unknown {label}: {}. Expected one of the IDs in schema/capabilities.json.",
+        "Unknown {label}: {}. Expected one of the IDs in the loaded capability catalog.",
         value.0
     );
 }
@@ -256,6 +256,7 @@ pub fn normalize_secondary_ids(
     Ok(acc.into_iter().collect())
 }
 
+/// Helper used by CLI parsing to single-source non-empty string checks.
 pub fn not_empty(value: &String) -> bool {
     !value.is_empty()
 }

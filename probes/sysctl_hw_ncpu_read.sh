@@ -8,7 +8,9 @@ run_mode="${FENCE_RUN_MODE:-baseline}"
 probe_name="sysctl_hw_ncpu_read"
 primary_capability_id="cap_sysctl_read_basic"
 sysctl_key="${FENCE_SYSCTL_KEY:-hw.ncpu}"
-printf -v command_executed "sysctl -n %q" "${sysctl_key}"
+sysctl_bin_default=$(command -v sysctl || true)
+sysctl_bin="${FENCE_SYSCTL_BIN:-${sysctl_bin_default:-/usr/sbin/sysctl}}"
+printf -v command_executed "%q -n %q" "${sysctl_bin}" "${sysctl_key}"
 
 stdout_tmp=$(mktemp)
 stderr_tmp=$(mktemp)
@@ -20,7 +22,7 @@ message=""
 raw_exit_code=""
 
 set +e
-/usr/sbin/sysctl -n "${sysctl_key}" >"${stdout_tmp}" 2>"${stderr_tmp}"
+"${sysctl_bin}" -n "${sysctl_key}" >"${stdout_tmp}" 2>"${stderr_tmp}"
 exit_code=$?
 set -e
 raw_exit_code="${exit_code}"
@@ -71,6 +73,8 @@ fi
   --raw-exit-code "${raw_exit_code}" \
   --payload-stdout "${stdout_text}" \
   --payload-stderr "${stderr_text}" \
+  --payload-raw-field "sysctl_bin" "${sysctl_bin}" \
   --payload-raw-field "sysctl_key" "${sysctl_key}" \
   "${raw_value_flag[@]}" \
-  --operation-arg "sysctl_key" "${sysctl_key}"
+  --operation-arg "sysctl_key" "${sysctl_key}" \
+  --operation-arg "sysctl_bin" "${sysctl_bin}"

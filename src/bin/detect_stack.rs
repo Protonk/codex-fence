@@ -2,10 +2,12 @@
 //!
 //! The binary is intentionally dependency-free and lightweight because probes
 //! invoke it for every record. It reflects the current run mode (from CLI or
-//! env), infers sandbox/codex details, and emits a JSON `StackInfo` snapshot.
+//! env), infers sandbox/external-runner details, and emits a JSON `StackInfo`
+//! snapshot.
 
 use anyhow::Result;
-use codex_fence::connectors::{RunMode, sandbox_override_from_env};
+use fencerunner::connectors::{RunMode, sandbox_override_from_env};
+use fencerunner::external_cli_command;
 use serde::Serialize;
 use std::env;
 use std::process::Command;
@@ -21,18 +23,18 @@ fn run() -> Result<()> {
     let cli_run_mode = parse_cli_run_mode();
     let run_mode_raw = match cli_run_mode {
         Some(mode) => mode,
-        None => env_non_empty("FENCE_RUN_MODE").unwrap_or_else(|| usage_and_exit()),
+        None => env_non_empty_any(&["FENCE_RUN_MODE"]).unwrap_or_else(|| usage_and_exit()),
     };
 
     let run_mode = RunMode::try_from(run_mode_raw.as_str())?;
     let sandbox_mode = run_mode.sandbox_stack_value(sandbox_override_from_env())?;
-    let codex_cli_version = detect_codex_cli_version();
-    let codex_profile = env_non_empty("FENCE_CODEX_PROFILE");
+    let external_cli_version = detect_external_cli_version();
+    let external_profile = env_non_empty_any(&["FENCE_EXTERNAL_PROFILE", "FENCE_CODEX_PROFILE"]);
     let os_info = detect_uname(&["-srm"]).unwrap_or_else(|| fallback_os_info());
 
     let info = StackInfo {
-        codex_cli_version,
-        codex_profile,
+        external_cli_version,
+        external_profile,
         sandbox_mode,
         os: os_info,
     };
@@ -43,8 +45,8 @@ fn run() -> Result<()> {
 
 #[derive(Serialize)]
 struct StackInfo {
-    codex_cli_version: Option<String>,
-    codex_profile: Option<String>,
+    external_cli_version: Option<String>,
+    external_profile: Option<String>,
     sandbox_mode: Option<String>,
     os: String,
 }
@@ -61,8 +63,11 @@ fn parse_cli_run_mode() -> Option<String> {
     Some(first)
 }
 
-fn detect_codex_cli_version() -> Option<String> {
-    let output = Command::new("codex").arg("--version").output().ok()?;
+fn detect_external_cli_version() -> Option<String> {
+    let output = Command::new(external_cli_command())
+        .arg("--version")
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -96,6 +101,15 @@ fn env_non_empty(name: &str) -> Option<String> {
         Ok(value) if !value.is_empty() => Some(value),
         _ => None,
     }
+}
+
+fn env_non_empty_any(names: &[&str]) -> Option<String> {
+    for name in names {
+        if let Some(value) = env_non_empty(name) {
+            return Some(value);
+        }
+    }
+    None
 }
 
 fn usage_and_exit() -> ! {

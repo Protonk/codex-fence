@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use codex_fence::find_repo_root;
+use fencerunner::find_repo_root;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicBool, Ordering};

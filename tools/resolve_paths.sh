@@ -2,10 +2,10 @@
 # Shared path helpers for contract tooling. Source this file to populate
 # REPO_ROOT plus portable realpath + probe resolution utilities.
 
-if [[ -n "${CODEX_FENCE_RESOLVE_PATHS_SOURCED:-}" ]]; then
+if [[ -n "${FENCE_RESOLVE_PATHS_SOURCED:-}" ]]; then
   return 0 2>/dev/null || exit 0
 fi
-CODEX_FENCE_RESOLVE_PATHS_SOURCED=1
+FENCE_RESOLVE_PATHS_SOURCED=1
 
 if [[ -z "${REPO_ROOT:-}" ]]; then
   REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)

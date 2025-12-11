@@ -38,7 +38,7 @@ target_file="${workspace_tmp}/fixture.txt"
 trap 'rm -rf "${workspace_tmp}"' EXIT
 
 printf 'fixture-line' > "${target_file}"
-# Mirror what bin/fence-run would capture so the record looks realistic.
+# Mirror what bin/probe-exec would capture so the record looks realistic.
 command_executed="printf fixture-line > ${target_file}"
 
 # Emit the same boundary object a real probe would create.

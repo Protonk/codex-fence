@@ -1,6 +1,6 @@
 # Probe Contract and Boundary Object (cfbo-v1)
 
-`codex-fence` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v1** is the current contract. It incorporates the current capability schema (via the Rust capability index backed by `schema/capabilities.json`) so every record carries a snapshot of the capability metadata it referenced.
+`probe` records every probe run as a versioned JSON “boundary object”. Version **cfbo-v1** is the current contract. It incorporates the current capability catalog (via the Rust capability index backed by the catalog schema and bundled catalog) so every record carries a snapshot of the capability metadata it referenced.
 
 Each boundary object captures *one* probe execution in one run mode. Probes are tiny scripts stored under `probes/<probe_id>.sh` (filenames match the capability catalog’s probe ids) that:
 
@@ -28,8 +28,8 @@ The machine-readable definition lives in `schema/boundary_object.json` and is en
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"cfbo-v1"`. |
-| `capabilities_schema_version` | yes (nullable) | The version from `schema/capabilities.json` resolved via the capability index. It is a string with no whitespace such as `macOS_codex_v1`; `null` is reserved for situations where the schema cannot be determined. |
-| `stack` | yes | Fingerprint of the Codex CLI + OS stack that hosted the probe. |
+| `capabilities_schema_version` | yes | The catalog key from the loaded capability catalog. It is a string with no whitespace such as `macOS_codex_v1`. |
+| `stack` | yes | Fingerprint of the external CLI (when present) and OS stack that hosted the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command). This harness intentionally omits timestamps so records stay stateless. |
 | `operation` | yes | Description of the sandbox-facing operation being attempted. |
@@ -43,14 +43,14 @@ Populated automatically by `bin/detect-stack`.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `codex_cli_version` | yes (nullable) | Output of `codex --version` if available, else `null`. |
-| `codex_profile` | yes (nullable) | Codex profile name if known (`FENCE_CODEX_PROFILE`). |
+| `external_cli_version` | yes (nullable) | Output of the configured external CLI `--version` if available, else `null`. |
+| `external_profile` | yes (nullable) | Runner profile/mode if known (`FENCE_EXTERNAL_PROFILE` or `FENCE_CODEX_PROFILE`). |
 | `sandbox_mode` | yes (nullable) | `read-only`, `workspace-write`, `danger-full-access`, or `null` for baseline runs. |
 | `os` | yes | Value from `uname -srm`. |
 
 ### `probe`
 
-`bin/emit-record` validates capability IDs by loading `schema/capabilities.json` directly (the legacy adapter remains for automation).
+`bin/emit-record` validates capability IDs by loading the bundled capability catalog directly (the legacy adapter remains for automation).
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -67,8 +67,8 @@ cfbo-v1 deliberately does **not** capture timestamps or run durations. The harne
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `mode` | yes | `baseline`, `codex-sandbox`, or `codex-full`; matches `bin/fence-run`. |
-| `workspace_root` | yes (nullable) | Canonical workspace root exported by `bin/fence-run` (`FENCE_WORKSPACE_ROOT`), falling back to `git rev-parse` / `pwd` if unset. |
+| `mode` | yes | `baseline`, `codex-sandbox`, or `codex-full`; matches `bin/probe-exec`. |
+| `workspace_root` | yes (nullable) | Canonical workspace root exported by `bin/probe-exec` (`FENCE_WORKSPACE_ROOT`), falling back to `git rev-parse` / `pwd` if unset. |
 | `command` | yes | Human/machine-usable string describing the actual command. |
 
 
@@ -140,13 +140,13 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
   "run": {
     "mode": "codex-sandbox",
     "workspace_root": "/Users/example/project",
-    "command": "printf 'codex-fence write ...' >> '/tmp/codex-fence-outside-root-test'"
+    "command": "printf 'probe write ...' >> '/tmp/probe-outside-root-test'"
   },
   "operation": {
     "category": "fs",
     "verb": "write",
-    "target": "/tmp/codex-fence-outside-root-test",
-    "args": {"write_mode": "append", "attempt_bytes": 43}
+    "target": "/tmp/probe-outside-root-test",
+    "args": {"write_mode": "append", "attempt_bytes": 38}
   },
   "result": {
     "observed_result": "denied",
@@ -157,7 +157,7 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
   },
   "payload": {
     "stdout_snippet": "",
-    "stderr_snippet": "bash: /tmp/codex-fence-outside-root-test: Permission denied",
+    "stderr_snippet": "bash: /tmp/probe-outside-root-test: Permission denied",
     "raw": {}
   },
   "capability_context": {
@@ -169,8 +169,8 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
     "secondary": []
   },
   "stack": {
-    "codex_cli_version": "codex 1.2.3",
-    "codex_profile": "Auto",
+    "external_cli_version": "codex 1.2.3",
+    "external_profile": "Auto",
     "sandbox_mode": "workspace-write",
     "os": "Darwin 23.3.0 arm64"
   }
@@ -185,5 +185,6 @@ When the boundary-object contract needs to change in a backward-incompatible way
 2. Update this document to describe the new version, including any added or removed fields and the rationale for the change.
 3. Refresh `AGENTS.md`, `README.md`, `docs/probes.md`, and any tooling that validates or emits boundary objects (`bin/emit-record`, `tests/`, probe helpers) so they reference and enforce the new schema.
 4. Document the migration expectations (whether older versions are still accepted, and for how long) alongside the new version announcement.
+5. Use `--boundary-schema` (or `FENCE_BOUNDARY_SCHEMA_PATH`) to validate or emit against a drop-in schema file when experimenting with new versions; the active schema’s `schema_version` will be written into emitted records.
 
 Until such a change is made, cfbo-v1 remains the committed contract.

@@ -1,21 +1,21 @@
 # Agent Guidance for Rust Binaries
 
-`src/bin/` contains the canonical helper implementations. `make build-bin`
+`src/bin/` contains the canonical helper implementations. `make build`
 copies them into `bin/` so probes/tests can keep invoking `bin/<name>`; when you
 change behavior, update Rust here first and then sync the artifacts.
 
 ## CLI entry points (front doors)
 
-### `codex-fence`
-Front door for `--bang/--listen/--rattle`; its job is to locate helpers and set
-`CODEX_FENCE_ROOT` so downstream binaries find the repo. Keep the CLI contract
-stable, prefer repo helpers before PATH, and propagate exit codes verbatim.
+### `probe`
+Front door for `--matrix/--listen/--target`; its job is to locate helpers and set
+`FENCE_ROOT` so downstream binaries find the repo. Keep the CLI contract stable, prefer repo helpers before
+PATH, and propagate exit codes verbatim.
 
-### `fence-run`
-Executes a probe in a requested mode, exporting `FENCE_*` metadata and enforcing
-that probes live under `probes/`. Keep probe resolution strict, honor
-`--workspace-root`/`FENCE_WORKSPACE_ROOT`, and ensure sandbox env matches the
-mode (baseline vs codex modes).
+### `probe-exec`
+Executes a probe in a requested mode, exporting `FENCE_*` metadata and enforcing that probes live under `probes/`. Keep probe
+resolution strict, honor `--workspace-root`/`FENCE_WORKSPACE_ROOT`, and
+ensure sandbox env matches the mode (baseline vs external CLI modes such as
+`codex-sandbox`/`codex-full` when configured).
 
 ## Record helpers (cfbo emission/introspection)
 
@@ -25,31 +25,32 @@ the in-repo catalog, and shell out only to `detect-stack`. stdout should only
 carry the final JSON record.
 
 ### `detect-stack`
-Captures codex CLI details, sandbox metadata, and OS info. Keep it dependency-
-free and fast; never drop existing JSON keys without versioning, and default new
-keys sensibly.
+Captures external CLI details, sandbox metadata, and OS info. Keep it
+dependency-free and fast; never drop existing JSON keys without versioning, and
+default new keys sensibly.
 
-### `fence-listen`
+### `probe-listen`
 Reads cfbo-v1 NDJSON/arrays and prints a human summary. Reject invalid input
 with clear errors; don’t panic.
 
 ## Harness helpers (probe orchestration)
 
-### `fence-bang`
-Iterates probes/modes via `fence-run`, emitting NDJSON. Reuse
+### `probe-matrix`
+Iterates probes/modes via `probe-exec`, emitting NDJSON. Reuse
 `resolve_helper_binary`, enforce mode/probe selection per docs, and keep error
 messages actionable.
 
-### `fence-rattle`
-Backs `codex-fence --rattle` by selecting probes (by capability id or explicit
-ids) and delegating execution to `fence-bang`. Enforce the flag contract (cap
-or probe required, `--mode` limited to baseline/codex-sandbox/codex-full with
-the same defaults as `fence-bang`), use the bundled catalog for `--cap`, and
-keep list-only output deterministic.
+### `probe-target`
+Backs `probe --target` by selecting probes (by capability id or explicit
+ids) and delegating execution to `probe-matrix`. Enforce the flag contract
+(cap or probe required, `--mode` limited to baseline/codex-sandbox/codex-full
+with the same defaults as `probe-matrix`), use the bundled catalog for
+`--cap`, and keep list-only output deterministic.
 
-### `fence-test`
-Runs `tools/validate_contract_gate.sh` with predictable env/repo detection.
-Mirror the static helper’s flags and surface exit codes verbatim.
+### `probe-gate`
+Runs `tools/validate_contract_gate.sh` (the probe contract gate) with
+predictable env/repo detection. Mirror the script’s flags and surface exit
+codes verbatim.
 
 ## Utility helpers
 

@@ -1,4 +1,4 @@
-//! Shared library for the codex-fence harness.
+//! Shared library for the probe harness.
 //!
 //! This crate is intentionally small and repetitive to make visible
 //! how the layers stack. Each public function exists because a binary
@@ -9,7 +9,9 @@ use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::{
-    env, fs,
+    env,
+    ffi::OsString,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -24,12 +26,13 @@ pub mod probe_metadata;
 pub mod runtime;
 
 pub use boundary::{
-    BoundaryObject, BoundaryReadError, CapabilityContext, OperationInfo, Payload, ProbeInfo,
-    ResultInfo, RunInfo, StackInfo, read_boundary_objects,
+    BoundaryObject, BoundaryReadError, BoundarySchema, CapabilityContext, OperationInfo, Payload,
+    ProbeInfo, ResultInfo, RunInfo, StackInfo, read_boundary_objects,
 };
 pub use catalog::{
     Capability, CapabilityCatalog, CapabilityCategory, CapabilityId, CapabilityIndex,
-    CapabilityLayer, CapabilitySnapshot, CatalogKey, CatalogRepository, load_catalog_from_path,
+    CapabilityLayer, CapabilitySnapshot, CatalogKey, CatalogRepository, DEFAULT_CATALOG_PATH,
+    load_catalog_from_path,
 };
 pub use coverage::{CoverageEntry, build_probe_coverage_map, filter_coverage_probes};
 pub use metadata_validation::{validate_boundary_objects, validate_probe_capabilities};
@@ -38,6 +41,9 @@ pub use probe_metadata::{ProbeMetadata, collect_probe_scripts};
 // === Repository discovery and helper resolution ===
 const ROOT_SENTINEL: &str = "bin/.gitkeep";
 const MAKEFILE: &str = "Makefile";
+const ENV_CATALOG_PATH: &str = "FENCE_CATALOG_PATH";
+const ENV_BOUNDARY_SCHEMA_PATH: &str = "FENCE_BOUNDARY_SCHEMA_PATH";
+pub const DEFAULT_BOUNDARY_SCHEMA_PATH: &str = "schema/boundary_object.json";
 
 /// Returns true when `candidate` looks like the repository root.
 ///
@@ -48,7 +54,7 @@ fn is_repo_root(candidate: &Path) -> bool {
     candidate.join(ROOT_SENTINEL).is_file() && candidate.join(MAKEFILE).is_file()
 }
 
-/// Verifies that an explicit `CODEX_FENCE_ROOT` hint points at a valid repo.
+/// Verifies that an explicit `FENCE_ROOT` hint points at a valid repo.
 fn repo_root_from_hint(hint: &str) -> Option<PathBuf> {
     if hint.is_empty() {
         return None;
@@ -79,7 +85,7 @@ fn search_upwards(start: &Path) -> Option<PathBuf> {
 /// executable location, then the build-time hint. Callers can treat failure as
 /// fatal because binaries cannot run without the repo layout.
 pub fn find_repo_root() -> Result<PathBuf> {
-    if let Ok(env_root) = env::var("CODEX_FENCE_ROOT") {
+    if let Ok(env_root) = env::var("FENCE_ROOT") {
         if let Some(root) = repo_root_from_hint(&env_root) {
             return Ok(root);
         }
@@ -93,20 +99,63 @@ pub fn find_repo_root() -> Result<PathBuf> {
         }
     }
 
-    if let Some(hint) = option_env!("CODEX_FENCE_ROOT_HINT") {
+    if let Some(hint) = option_env!("FENCE_ROOT_HINT") {
         if let Some(root) = repo_root_from_hint(hint) {
             return Ok(root);
         }
     }
 
-    bail!(
-        "Unable to locate codex-fence repository root. Set CODEX_FENCE_ROOT to the cloned repository."
-    );
+    bail!("Unable to locate probe repository root. Set FENCE_ROOT to the cloned repository.");
+}
+
+/// Resolve the capability catalog path using CLI/env overrides or the default.
+pub fn resolve_catalog_path(repo_root: &Path, cli_override: Option<&Path>) -> PathBuf {
+    resolve_repo_data_path(
+        repo_root,
+        cli_override,
+        ENV_CATALOG_PATH,
+        DEFAULT_CATALOG_PATH,
+    )
+}
+
+/// Resolve the boundary-object schema path using CLI/env overrides or the default.
+pub fn resolve_boundary_schema_path(repo_root: &Path, cli_override: Option<&Path>) -> PathBuf {
+    resolve_repo_data_path(
+        repo_root,
+        cli_override,
+        ENV_BOUNDARY_SCHEMA_PATH,
+        DEFAULT_BOUNDARY_SCHEMA_PATH,
+    )
+}
+
+fn resolve_repo_data_path(
+    repo_root: &Path,
+    cli_override: Option<&Path>,
+    env_key: &str,
+    default_relative: &str,
+) -> PathBuf {
+    if let Some(path) = cli_override {
+        return repo_relative(repo_root, path);
+    }
+    if let Ok(env_path) = env::var(env_key) {
+        if !env_path.is_empty() {
+            return repo_relative(repo_root, Path::new(&env_path));
+        }
+    }
+    repo_root.join(default_relative)
+}
+
+fn repo_relative(repo_root: &Path, candidate: &Path) -> PathBuf {
+    if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        repo_root.join(candidate)
+    }
 }
 
 /// Resolve another helper binary within the same repo.
 ///
-/// Prefers the synced `bin/` artifacts (kept up to date by `make build-bin`),
+/// Prefers the synced `bin/` artifacts (kept up to date by `make build`),
 /// then falls back to Cargo build outputs. Every binary should go through this
 /// helper so the search order stays consistent.
 pub fn resolve_helper_binary(repo_root: &Path, name: &str) -> Result<PathBuf> {
@@ -116,18 +165,38 @@ pub fn resolve_helper_binary(repo_root: &Path, name: &str) -> Result<PathBuf> {
     }
 
     bail!(
-        "Unable to locate helper '{name}' under {}. Run 'make build-bin' to sync the Rust binaries.",
+        "Unable to locate helper '{name}' under {}. Run 'make build' to sync the Rust binaries.",
         repo_root.display()
     );
 }
 
-/// Returns true when an executable named `codex` exists somewhere on PATH.
-pub fn codex_present() -> bool {
+/// Returns the configured external CLI runner command (defaults to `codex`).
+pub fn external_cli_command() -> OsString {
+    env::var_os("FENCE_EXTERNAL_CLI")
+        .or_else(|| env::var_os("CODEX_CLI"))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| OsString::from("codex"))
+}
+
+/// Returns true when the configured external CLI runner is present on PATH.
+pub fn external_cli_present() -> bool {
+    let command = external_cli_command();
+    let command_path = PathBuf::from(&command);
+    if command_path.components().count() > 1 {
+        return runtime::helper_is_executable(&command_path);
+    }
+
     env::var_os("PATH")
         .map(|paths| {
-            env::split_paths(&paths).any(|dir| runtime::helper_is_executable(&dir.join("codex")))
+            env::split_paths(&paths).any(|dir| runtime::helper_is_executable(&dir.join(&command)))
         })
         .unwrap_or(false)
+}
+
+/// Legacy alias for detecting a `codex` binary on PATH.
+#[deprecated(note = "use external_cli_present instead")]
+pub fn codex_present() -> bool {
+    external_cli_present()
 }
 
 // === Small parsing helpers ===
@@ -320,8 +389,8 @@ mod tests {
             "schema_version": "cfbo-v1",
             "capabilities_schema_version": "macOS_codex_v1",
             "stack": {
-                "codex_cli_version": null,
-                "codex_profile": null,
+                "external_cli_version": null,
+                "external_profile": null,
                 "sandbox_mode": null,
                 "os": "Darwin"
             },

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "probe"
+  },
+  {
+    "name": "probe-matrix"
+  },
+  {
+    "name": "probe-target"
+  },
+  {
+    "name": "probe-listen"
+  },
+  {
+    "name": "probe-exec"
+  },
+  {
+    "name": "probe-gate"
+  },
+  {
+    "name": "detect-stack"
+  },
+  {
+    "name": "emit-record"
+  },
+  {
+    "name": "portable-path"
+  },
+  {
+    "name": "json-extract"
+  },
+  {
+    "name": "paging-stress"
+  }
+]

@@ -1,11 +1,11 @@
 # probes/AGENTS.md
 
-This directory contains many probes, small programs built to test validated capabilities and emit contracted output, allowing us to test the security policy surface around `codex` without knowing it exactly. Read this file to understand the Probe and Probe Author contract.
+This directory contains probes: small programs built to test validated capabilities and emit contracted output, allowing us to probe a sandboxed runtime without assuming its exact policy. Read this file to understand the Probe and Probe Author contract.
 
 ## Probe Author contract
 
 As the Probe Author, you:
-- Use the capability catalog in `schema/capabilities.json` to select accurate
+- Use the capability catalog in `catalogs/macos_codex_v1.json` to select accurate
   `primary_capability_id` values. `bin/emit-record` validates IDs, so use the
   exact slugs defined in that file.
 - Read `schema/boundary_object.json` alongside
@@ -23,7 +23,9 @@ Keep each probe:
   relpath, `bin/json-extract` when you must parse JSON). Build payloads and
   operation args with `bin/emit-record` flags (`--payload-stdout/-stderr`,
   `--payload-raw-field[-json|-list|-null]`, `--operation-arg[...]`) instead of
-  constructing JSON manually.
+  constructing JSON manually. Include `--run-mode "$FENCE_RUN_MODE"` so
+  emitted records capture the active mode (`probe-exec` exports both
+  `FENCE_*` and legacy `FENCE_*` names).
 - Clearly labeled with `primary_capability_id`. Choose the best match from the
   catalog and optionally list related capabilities in
   `secondary_capability_ids`. `bin/emit-record` enforces these IDs.
@@ -45,7 +47,7 @@ about coverage without depending on directory names.
 ## Using compiled helpers from probes
 
 Probes may delegate narrowly scoped work to compiled helpers under
-`probe-runtime/` (synced into `bin/` by `make build-bin`). Keep the probe as the
+`probe-runtime/` (synced into `bin/` by `make build`). Keep the probe as the
 orchestrator: pass explicit arguments, enforce a timeout, and still emit the
 single JSON record via `bin/emit-record`. Helpers must stay quiet on stdout,
 run in the foreground, and use stable, documented exit codes (0 success, 1
@@ -72,15 +74,15 @@ A probe:
    `denied`.
 4. Calls `bin/emit-record` once with the correct flags (payload/operation args
    built inline). Pass `--run-mode "$FENCE_RUN_MODE"` (exported by
-   `bin/fence-run`) so the emitted record matches the current mode.
-5. Exits with status `0` after emitting JSON. `bin/fence-run` relies on this
-  behavior so `codex-fence --bang` can stream records as NDJSON.
+   `bin/probe-exec`) so the emitted record matches the current mode.
+5. Exits with status `0` after emitting JSON. `bin/probe-exec` relies on this
+  behavior so `probe --matrix` can stream records as NDJSON.
 
 ### How a probe should emit JSON
 
 Call `bin/emit-record` exactly once with:
 
-- `--run-mode "$FENCE_RUN_MODE"` (already exported by `bin/fence-run`).
+- `--run-mode "$FENCE_RUN_MODE"` (already exported by `bin/probe-exec`).
 - `--probe-name "$probe_id"` and `--probe-version "<semver>"`.
 - `--primary-capability-id`, zero or more `--secondary-capability-id`, and
   `--command`.
@@ -137,7 +139,7 @@ Matching JSON output (trimmed for brevity):
   "run": {
     "mode": "baseline",
     "workspace_root": "/path/to/workspace",
-    "command": "printf 'codex-fence write ...' >> '/tmp/codex-fence-outside-root-test'"
+    "command": "printf 'probe write ...' >> '/tmp/probe-outside-root-test'"
   },
   "result": {
     "observed_result": "denied",
@@ -149,12 +151,12 @@ Matching JSON output (trimmed for brevity):
   "operation": {
     "category": "fs",
     "verb": "write",
-    "target": "/tmp/codex-fence-outside-root-test",
-    "args": {"write_mode": "append", "attempt_bytes": 43}
+    "target": "/tmp/probe-outside-root-test",
+    "args": {"write_mode": "append", "attempt_bytes": 38}
   },
   "payload": {
     "stdout_snippet": "",
-    "stderr_snippet": "bash: /tmp/codex-fence-outside-root-test: Permission denied",
+    "stderr_snippet": "bash: /tmp/probe-outside-root-test: Permission denied",
     "raw": {}
   },
   "capability_context": {
@@ -166,8 +168,8 @@ Matching JSON output (trimmed for brevity):
     "secondary": []
   },
   "stack": {
-    "codex_cli_version": "codex 1.2.3",
-    "codex_profile": "Auto",
+    "external_cli_version": "codex 1.2.3",
+    "external_profile": "Auto",
     "sandbox_mode": "workspace-write",
     "os": "Darwin 23.3.0 arm64"
   }
