@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Boundary object schema descriptor (v1)",
+  "type": "object",
+  "required": ["schema_version", "schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "boundary_object_schema_v1"
+    },
+    "schema": {
+      "type": "object",
+      "required": ["key", "title", "description", "schema_path"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "schema_path": {"type": "string"},
+        "labels": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "notes": {"type": "string"}
+      }
+    },
+    "docs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["title"],
+        "additionalProperties": false,
+        "properties": {
+          "title": {"type": "string"},
+          "url": {"type": "string"},
+          "url_hint": {"type": "string"}
+        }
+      }
+    }
+  }
+}

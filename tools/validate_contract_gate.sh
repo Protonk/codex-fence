@@ -692,7 +692,9 @@ run_dynamic_gate() {
     PROBE_CONTRACT_GATE_STATE_DIR="${stub_state}"
     PROBE_CONTRACT_EXPECTED_RUN_MODE="${run_mode}"
     PROBE_CONTRACT_CAPABILITIES_JSON="${repo_root}/catalogs/macos_codex_v1.json"
-    PROBE_CONTRACT_CAPABILITIES_ADAPTER="${repo_root}/tools/adapt_capabilities.sh")
+    PROBE_CONTRACT_CAPABILITIES_ADAPTER="${repo_root}/tools/adapt_capabilities.sh"
+    FENCE_BOUNDARY_SCHEMA_PATH="${repo_root}/schema/boundary_object.json"
+    FENCE_BOUNDARY_SCHEMA_CATALOG_PATH="${repo_root}/catalogs/cfbo-v1.json")
 
   if [[ -n "${expected_probe_name}" ]]; then
     run_env+=("PROBE_CONTRACT_EXPECTED_PROBE_NAME=${expected_probe_name}")

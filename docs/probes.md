@@ -65,7 +65,8 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
 ## What a probe emits
 
 Every probe emits one [boundary object](boundary_object.md) that conforms to
-`schema/boundary_object.json`. Required data includes:
+the active boundary-object schema (default: `catalogs/cfbo-v1.json` ->
+`schema/boundary_object.json`). Required data includes:
 
 - Probe identity (`probe.id`, `probe.version`,
   `probe.primary_capability_id`, `probe.secondary_capability_ids`).

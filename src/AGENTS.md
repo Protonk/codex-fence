@@ -11,7 +11,9 @@ tree, emit/parse cfbo-v1, and share runtime helpers with the binaries under
   and the small helper APIs the binaries depend on. Keep public surface small
   and documented here or in the target module.
 - `boundary/` — cfbo-v1 types and serde. Schema changes start in
-  `schema/boundary_object.json` and docs, then land here with tests.
+  `schema/boundary_object_schema.json` plus the descriptor under `catalogs/`
+  (default: `cfbo-v1.json` -> `schema/boundary_object.json`) and docs, then
+  land here with tests.
 - `catalog/` — capability catalog parsing and indexing. Pure Rust; no shelling
   out. Must stay aligned with `schema/capability_catalog.schema.json` and the
   bundled catalogs under `catalogs/`.

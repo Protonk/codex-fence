@@ -1,6 +1,7 @@
 [toolchain]
-# Pick a specific stable version once you're happy with it:
-# e.g. "stable-1.82.0" or whatever you're targeting.
+# Keep a repo-level toolchain so helpers always build with clippy/rustfmt present
+# on a Rust stable new enough for Cargo.toml's rust-version; pin to a patch
+# release once the team settles on one (e.g. "stable-1.85.0").
 channel = "stable"
 profile = "default"
 components = ["clippy", "rustfmt"]

@@ -95,7 +95,7 @@ fn run() -> Result<()> {
     let boundary_schema_path = resolve_boundary_schema_path(
         &repo_root,
         args.boundary_schema_path.as_deref().map(Path::new),
-    );
+    )?;
     let boundary_schema = BoundarySchema::load(&boundary_schema_path).with_context(|| {
         format!(
             "loading boundary schema from {}",

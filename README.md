@@ -84,9 +84,10 @@ Two JSON schemas define how data flows through Fencerunner:
   `capabilities_schema_version` echoed into boundary objects).
 
 - **Boundary object schema (cfbo‑v1)**  
-  `schema/boundary_object.json` describes the cfbo‑v1 JSON records emitted by
-  probes. `docs/boundary_object.md` walks each field and explains evolution
-  rules.
+  `schema/boundary_object_schema.json` defines the descriptor format for
+  boundary schemas under `catalogs/` (default `catalogs/cfbo-v1.json`), which
+  points at the concrete cfbo‑v1 schema `schema/boundary_object.json`. `docs/boundary_object.md`
+  walks each field and explains evolution rules.
 
 The harness always requires a catalog and a boundary schema, but you can swap
 them out without changing code:
@@ -96,8 +97,10 @@ them out without changing code:
 - Use `FENCE_ALLOWED_CATALOG_SCHEMAS` (comma‑separated) to temporarily accept
   additional catalog `schema_version` values while experimenting.
 - Use `--boundary-schema <path>` or `FENCE_BOUNDARY_SCHEMA_PATH` to point
-  helpers at an alternate boundary‑object schema file; the loaded
-  `schema_version` is written into emitted records.
+  helpers at an alternate boundary‑object schema file. By default helpers read
+  `catalogs/cfbo-v1.json` (override with `FENCE_BOUNDARY_SCHEMA_CATALOG_PATH`)
+  to discover the active boundary schema; the loaded `schema_version` is
+  written into emitted records.
 
 The Rust layer (`src/catalog`, `src/boundary`) validates catalogs and boundary
 objects at load and emit time, and the integration tests under `tests/suite.rs`

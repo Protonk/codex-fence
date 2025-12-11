@@ -42,7 +42,7 @@ fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     let catalog_path = resolve_catalog_path(&repo_root, args.catalog_path.as_deref());
     let boundary_schema_path =
-        resolve_boundary_schema_path(&repo_root, args.boundary_schema_path.as_deref());
+        resolve_boundary_schema_path(&repo_root, args.boundary_schema_path.as_deref())?;
     let workspace_root = canonicalize_path(&repo_root);
     let workspace_plan = determine_workspace_plan(&workspace_root, args.workspace_override)?;
     let resolved_probe = resolve_probe(&workspace_root, &args.probe_name)?;
@@ -194,7 +194,7 @@ impl CliArgs {
 
 fn usage() -> ! {
     eprintln!(
-        "Usage: probe-exec [--workspace-root PATH] [--catalog PATH] [--boundary-schema PATH] MODE PROBE_NAME\n\nOverrides:\n  --workspace-root PATH     Export PATH via FENCE_WORKSPACE_ROOT (defaults to repo root).\n                            Pass an empty string to defer to emit-record's git/pwd fallback.\n  --catalog PATH            Override capability catalog path (or set FENCE_CATALOG_PATH).\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH).\n\nEnvironment:\n  FENCE_WORKSPACE_ROOT      When set, takes precedence over the default repo root export."
+        "Usage: probe-exec [--workspace-root PATH] [--catalog PATH] [--boundary-schema PATH] MODE PROBE_NAME\n\nOverrides:\n  --workspace-root PATH     Export PATH via FENCE_WORKSPACE_ROOT (defaults to repo root).\n                            Pass an empty string to defer to emit-record's git/pwd fallback.\n  --catalog PATH            Override capability catalog path (or set FENCE_CATALOG_PATH).\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH; default descriptor via FENCE_BOUNDARY_SCHEMA_CATALOG_PATH).\n\nEnvironment:\n  FENCE_WORKSPACE_ROOT      When set, takes precedence over the default repo root export."
     );
     std::process::exit(1);
 }

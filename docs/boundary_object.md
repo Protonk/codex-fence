@@ -16,14 +16,15 @@ See `probes/AGENTS.md` for the workflow details expected from probe authors.
 
 The project commits to the cfbo-v1 contract as specified by:
 
-- The machine-readable JSON schema at `schema/boundary_object.json`.
+- The boundary-schema descriptor schema at `schema/boundary_object_schema.json` plus the bundled descriptor `catalogs/cfbo-v1.json` (which points at the concrete cfbo-v1 schema).
+- The machine-readable cfbo-v1 JSON schema at `schema/boundary_object.json`.
 - This document’s field-by-field explanations.
 
 Within cfbo-v1, the required fields, field names, and semantics described below are stable. Changes that break compatibility (renaming fields, relaxing/adding required fields, or altering meanings) require creating a new schema version and updating this document to match.
 
 ## Boundary object layout (cfbo-v1)
 
-The machine-readable definition lives in `schema/boundary_object.json` and is enforced by `bin/emit-record`.
+The machine-readable definition lives in the schema referenced by the active descriptor (default: `catalogs/cfbo-v1.json` -> `schema/boundary_object.json`) and is enforced by `bin/emit-record`.
 
 | Field | Required | Description |
 | --- | --- | --- |
@@ -181,10 +182,10 @@ A trimmed record from `probes/fs_outside_workspace.sh` (writes outside the works
 
 When the boundary-object contract needs to change in a backward-incompatible way, follow this procedure:
 
-1. Add a new schema file (for example `schema/boundary_object_cfbo_v2.json`) with an updated `$id`, `title`, and `schema_version` constant while preserving the prior file unchanged.
+1. Add a new schema file (for example `schema/boundary_object_cfbo_v2.json`) with an updated `$id`, `title`, and `schema_version` constant while preserving the prior file unchanged, and add a matching descriptor under `catalogs/` that passes `schema/boundary_object_schema.json`.
 2. Update this document to describe the new version, including any added or removed fields and the rationale for the change.
 3. Refresh `AGENTS.md`, `README.md`, `docs/probes.md`, and any tooling that validates or emits boundary objects (`bin/emit-record`, `tests/`, probe helpers) so they reference and enforce the new schema.
 4. Document the migration expectations (whether older versions are still accepted, and for how long) alongside the new version announcement.
-5. Use `--boundary-schema` (or `FENCE_BOUNDARY_SCHEMA_PATH`) to validate or emit against a drop-in schema file when experimenting with new versions; the active schema’s `schema_version` will be written into emitted records.
+5. Use `--boundary-schema` (or `FENCE_BOUNDARY_SCHEMA_PATH`) to validate or emit against a drop-in schema file when experimenting with new versions; otherwise set `FENCE_BOUNDARY_SCHEMA_CATALOG_PATH` to point at an alternate descriptor. The active schema’s `schema_version` will be written into emitted records.
 
 Until such a change is made, cfbo-v1 remains the committed contract.

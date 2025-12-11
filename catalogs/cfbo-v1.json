@@ -1,0 +1,17 @@
+{
+  "schema_version": "boundary_object_schema_v1",
+  "schema": {
+    "key": "cfbo-v1",
+    "title": "Canonical Fencerunner boundary object (v1)",
+    "description": "Boundary-object schema used by the bundled probes and helpers.",
+    "schema_path": "schema/boundary_object.json",
+    "labels": ["cfbo", "v1"],
+    "notes": "Default cfbo-v1 schema. Swap this file (or set FENCE_BOUNDARY_SCHEMA_CATALOG_PATH) to point helpers at a different boundary-object schema."
+  },
+  "docs": {
+    "boundary_object_contract": {
+      "title": "Boundary object contract",
+      "url": "docs/boundary_object.md"
+    }
+  }
+}

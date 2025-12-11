@@ -30,7 +30,7 @@ fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     let catalog_path = resolve_catalog_path(&repo_root, cli.catalog_path.as_deref());
     let boundary_schema_path =
-        resolve_boundary_schema_path(&repo_root, cli.boundary_schema_path.as_deref());
+        resolve_boundary_schema_path(&repo_root, cli.boundary_schema_path.as_deref())?;
     let modes = resolve_modes(&cli.modes)?;
     let plan = resolve_selection(&repo_root, &catalog_path, &cli.selection)?;
 
@@ -338,7 +338,7 @@ fn normalize_token(raw: String, flag: &str) -> Result<String> {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe-target (--cap <capability-id> | --probe <probe-id>) [options]\n\nOptions:\n      --cap <id>            Run every probe whose primary capability matches <id>.\n      --probe <id>          Run a specific probe (repeatable).\n      --mode <mode>         Restrict modes (baseline, codex-sandbox, codex-full).\n      --repeat <n>          Rerun the selection n times (default: 1).\n      --catalog <path>      Override capability catalog path (or set FENCE_CATALOG_PATH).\n      --boundary-schema <path> Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH).\n      --list-only           Print the plan without executing probes.\n      --help                Show this help text.\n"
+        "Usage: probe-target (--cap <capability-id> | --probe <probe-id>) [options]\n\nOptions:\n      --cap <id>            Run every probe whose primary capability matches <id>.\n      --probe <id>          Run a specific probe (repeatable).\n      --mode <mode>         Restrict modes (baseline, codex-sandbox, codex-full).\n      --repeat <n>          Rerun the selection n times (default: 1).\n      --catalog <path>      Override capability catalog path (or set FENCE_CATALOG_PATH).\n      --boundary-schema <path> Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH; default descriptor via FENCE_BOUNDARY_SCHEMA_CATALOG_PATH).\n      --list-only           Print the plan without executing probes.\n      --help                Show this help text.\n"
     );
     std::process::exit(code);
 }

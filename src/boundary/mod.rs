@@ -1,9 +1,16 @@
 //! Serializable types for the `cfbo-v1` boundary object.
 //!
 //! Shared between the emit/listen binaries and the test suite. The structures
-//! mirror `schema/boundary_object.json` so helpers can round-trip JSON without
+//! mirror the active boundary-object schema (default: `catalogs/cfbo-v1.json`
+//! -> `schema/boundary_object.json`) so helpers can round-trip JSON without
 //! re-parsing ad-hoc maps. When attaching capability context, callers are
 //! expected to use snapshots from the capability catalog resolved at runtime.
+
+pub mod schema_catalog;
+
+pub use schema_catalog::{
+    BoundarySchemaCatalog, BoundarySchemaDescriptor, BOUNDARY_SCHEMA_CATALOG_VERSION,
+};
 
 use crate::catalog::{Capability, CapabilityId, CapabilitySnapshot, CatalogKey, CatalogRepository};
 use anyhow::{Context, Result, bail};

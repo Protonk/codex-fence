@@ -32,7 +32,7 @@ fn run() -> Result<()> {
     let repo_root = find_repo_root()?;
     let catalog_path = resolve_catalog_path(&repo_root, cli.catalog_path.as_deref());
     let boundary_schema_path =
-        resolve_boundary_schema_path(&repo_root, cli.boundary_schema_path.as_deref());
+        resolve_boundary_schema_path(&repo_root, cli.boundary_schema_path.as_deref())?;
     let probes = resolve_probes(&repo_root)?;
     let modes = resolve_modes()?;
 
@@ -218,7 +218,7 @@ fn next_path(flag: &str, args: &mut env::ArgsOs) -> Result<PathBuf> {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe-matrix [--catalog PATH] [--boundary-schema PATH]\n\nOptions:\n  --catalog PATH            Override capability catalog path (or set FENCE_CATALOG_PATH).\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH).\n  --help                    Show this help text."
+        "Usage: probe-matrix [--catalog PATH] [--boundary-schema PATH]\n\nOptions:\n  --catalog PATH            Override capability catalog path (or set FENCE_CATALOG_PATH).\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH; default descriptor via FENCE_BOUNDARY_SCHEMA_CATALOG_PATH).\n  --help                    Show this help text."
     );
     std::process::exit(code);
 }

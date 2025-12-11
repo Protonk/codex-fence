@@ -15,10 +15,10 @@ Use this file before you read or edit anything in `docs/`.
 1. Start with the project root `README.md` if you need the big picture: why `probe` exists, what a “probe” is, and how the harness runs.
 2. Treat everything in `docs/` as *explanatory lenses* over:
    - `schema/capability_catalog.schema.json` + `catalogs/*.json` (capability map, versioned)
-   - `schema/boundary_object.json` (boundary object schema)
+   - `schema/boundary_object_schema.json` + `catalogs/cfbo-v1.json` (boundary-object schema descriptor) and the concrete boundary schema it points to (default: `schema/boundary_object.json`)
    - the probe authoring contracts in `probes/AGENTS.md`
    - the test harness described in `tests/AGENTS.md`
-3. Helper binaries accept drop-in artifacts: use `--catalog` / `FENCE_CATALOG_PATH` (and `FENCE_ALLOWED_CATALOG_SCHEMAS` for testing new catalog schema versions) plus `--boundary-schema` / `FENCE_BOUNDARY_SCHEMA_PATH` to point at alternate schema files.
+3. Helper binaries accept drop-in artifacts: use `--catalog` / `FENCE_CATALOG_PATH` (and `FENCE_ALLOWED_CATALOG_SCHEMAS` for testing new catalog schema versions) plus `--boundary-schema` / `FENCE_BOUNDARY_SCHEMA_PATH` to point at alternate boundary schema files. When no direct override is provided, helpers read `FENCE_BOUNDARY_SCHEMA_CATALOG_PATH` (default: `catalogs/cfbo-v1.json`) to find the active boundary-object schema.
 3. When documentation and machine artifacts disagree, the machine artifacts win. Fix the docs to match the schema/tests, not the other way around.
 
 If you are a model-based agent: prefer reading the JSON schemas and `AGENTS.md` contracts in other directories when you need normative rules. Use these docs to understand structure and intent.
@@ -74,7 +74,7 @@ Documents the “boundary object” (currently `cfbo-v1`):
 - Clarifies how `observed_result` should be interpreted and how payloads should remain small and structured.
 - Describes the expected evolution path when the contract changes (new schema version, migration expectations, etc.).
 
-The machine-readable contract is `schema/boundary_object.json`, enforced by `bin/emit-record` and the test suite.
+The machine-readable contract is `schema/boundary_object_schema.json` plus the active descriptor under `catalogs/` (default `catalogs/cfbo-v1.json`) which points at the concrete schema file (`schema/boundary_object.json`). Validation happens in `bin/emit-record` and the test suite.
 
 **Read this if**
 
@@ -86,7 +86,7 @@ The machine-readable contract is `schema/boundary_object.json`, enforced by `bin
 
 - Follow the “Updating the commitments” section at the end of this file:
   - Introduce a new schema file when breaking changes are needed.
-  - Update `schema/boundary_object.json` (or add `*_cfbo-v2.json`, etc.).
+  - Update `schema/boundary_object.json` (or add `*_cfbo-v2.json`, etc.) and wire it into a descriptor under `catalogs/`.
   - Refresh references in `AGENTS.md`, `README.md`, probe docs, and tests.
 - Never silently remove or repurpose fields without updating:
   - the schema,

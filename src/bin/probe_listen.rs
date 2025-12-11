@@ -259,10 +259,10 @@ fn resolve_listen_schema_path(
         return Ok(repo_relative(repo_root, Path::new(&env_path)));
     }
     if let Some(root) = repo_root {
-        return Ok(resolve_boundary_schema_path(root, None));
+        return resolve_boundary_schema_path(root, None);
     }
     bail!(
-        "Unable to resolve boundary schema path. Set --boundary-schema, FENCE_BOUNDARY_SCHEMA_PATH, or run from a probe repository."
+        "Unable to resolve boundary schema path. Set --boundary-schema, FENCE_BOUNDARY_SCHEMA_PATH, adjust FENCE_BOUNDARY_SCHEMA_CATALOG_PATH, or run from a probe repository."
     )
 }
 
@@ -278,7 +278,7 @@ fn repo_relative(base: Option<&Path>, candidate: &Path) -> PathBuf {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe --listen [--boundary-schema PATH]\n\nOptions:\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH).\n  --help                    Show this help text."
+        "Usage: probe --listen [--boundary-schema PATH]\n\nOptions:\n  --boundary-schema PATH    Override boundary-object schema path (or set FENCE_BOUNDARY_SCHEMA_PATH; default descriptor via FENCE_BOUNDARY_SCHEMA_CATALOG_PATH).\n  --help                    Show this help text."
     );
     std::process::exit(code);
 }
@@ -296,7 +296,7 @@ mod tests {
 
     fn boundary_schema() -> BoundarySchema {
         let repo_root = fencerunner::find_repo_root().expect("repo root");
-        let path = resolve_boundary_schema_path(&repo_root, None);
+        let path = resolve_boundary_schema_path(&repo_root, None).expect("resolve boundary schema");
         BoundarySchema::load(&path).expect("load boundary schema")
     }
 

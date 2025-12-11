@@ -26,8 +26,9 @@ pub mod probe_metadata;
 pub mod runtime;
 
 pub use boundary::{
-    BoundaryObject, BoundaryReadError, BoundarySchema, CapabilityContext, OperationInfo, Payload,
-    ProbeInfo, ResultInfo, RunInfo, StackInfo, read_boundary_objects,
+    BoundaryObject, BoundaryReadError, BoundarySchema, BoundarySchemaCatalog,
+    BoundarySchemaDescriptor, CapabilityContext, OperationInfo, Payload, ProbeInfo, ResultInfo,
+    RunInfo, StackInfo, read_boundary_objects,
 };
 pub use catalog::{
     Capability, CapabilityCatalog, CapabilityCategory, CapabilityId, CapabilityIndex,
@@ -43,7 +44,9 @@ const ROOT_SENTINEL: &str = "bin/.gitkeep";
 const MAKEFILE: &str = "Makefile";
 const ENV_CATALOG_PATH: &str = "FENCE_CATALOG_PATH";
 const ENV_BOUNDARY_SCHEMA_PATH: &str = "FENCE_BOUNDARY_SCHEMA_PATH";
+const ENV_BOUNDARY_SCHEMA_CATALOG_PATH: &str = "FENCE_BOUNDARY_SCHEMA_CATALOG_PATH";
 pub const DEFAULT_BOUNDARY_SCHEMA_PATH: &str = "schema/boundary_object.json";
+pub const DEFAULT_BOUNDARY_SCHEMA_CATALOG_PATH: &str = "catalogs/cfbo-v1.json";
 
 /// Returns true when `candidate` looks like the repository root.
 ///
@@ -118,13 +121,42 @@ pub fn resolve_catalog_path(repo_root: &Path, cli_override: Option<&Path>) -> Pa
     )
 }
 
-/// Resolve the boundary-object schema path using CLI/env overrides or the default.
-pub fn resolve_boundary_schema_path(repo_root: &Path, cli_override: Option<&Path>) -> PathBuf {
+/// Resolve the boundary-object schema path using CLI/env overrides or the default descriptor.
+pub fn resolve_boundary_schema_path(
+    repo_root: &Path,
+    cli_override: Option<&Path>,
+) -> Result<PathBuf> {
+    if let Some(path) = cli_override {
+        return Ok(repo_relative(repo_root, path));
+    }
+
+    if let Ok(env_path) = env::var(ENV_BOUNDARY_SCHEMA_PATH) {
+        if !env_path.is_empty() {
+            return Ok(repo_relative(repo_root, Path::new(&env_path)));
+        }
+    }
+
+    let catalog_path = resolve_boundary_schema_catalog_path(repo_root, None);
+    let descriptor = boundary::BoundarySchemaCatalog::load(&catalog_path).with_context(|| {
+        format!(
+            "loading boundary schema catalog from {}",
+            catalog_path.display()
+        )
+    })?;
+
+    Ok(descriptor.schema.schema_path(repo_root))
+}
+
+/// Resolve the boundary-object schema catalog path (descriptor) via CLI/env overrides.
+pub fn resolve_boundary_schema_catalog_path(
+    repo_root: &Path,
+    cli_override: Option<&Path>,
+) -> PathBuf {
     resolve_repo_data_path(
         repo_root,
         cli_override,
-        ENV_BOUNDARY_SCHEMA_PATH,
-        DEFAULT_BOUNDARY_SCHEMA_PATH,
+        ENV_BOUNDARY_SCHEMA_CATALOG_PATH,
+        DEFAULT_BOUNDARY_SCHEMA_CATALOG_PATH,
     )
 }
 

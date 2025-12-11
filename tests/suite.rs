@@ -13,11 +13,12 @@ use fencerunner::fence_run_support::{
     workspace_plan_from_override, workspace_tmpdir_plan,
 };
 use fencerunner::{
-    self, BoundaryObject, BoundarySchema, CapabilityCategory, CapabilityContext, CapabilityId,
-    CapabilityIndex, CapabilityLayer, CapabilitySnapshot, CatalogKey, CatalogRepository,
-    DEFAULT_BOUNDARY_SCHEMA_PATH, DEFAULT_CATALOG_PATH, OperationInfo, Payload, Probe, ProbeInfo,
-    ProbeMetadata, ResultInfo, RunInfo, StackInfo, external_cli_present, list_probes,
-    load_catalog_from_path, resolve_helper_binary, resolve_probe,
+    self, BoundaryObject, BoundarySchema, BoundarySchemaCatalog, CapabilityCategory,
+    CapabilityContext, CapabilityId, CapabilityIndex, CapabilityLayer, CapabilitySnapshot,
+    CatalogKey, CatalogRepository, DEFAULT_BOUNDARY_SCHEMA_CATALOG_PATH, DEFAULT_CATALOG_PATH,
+    OperationInfo, Payload, Probe, ProbeInfo, ProbeMetadata, ResultInfo, RunInfo, StackInfo,
+    external_cli_present, list_probes, load_catalog_from_path, resolve_boundary_schema_path,
+    resolve_helper_binary, resolve_probe,
 };
 use jsonschema::JSONSchema;
 use serde_json::{Value, json};
@@ -193,7 +194,7 @@ fn boundary_object_schema() -> Result<()> {
     let schema = if let Some(existing) = BOUNDARY_OBJECT_SCHEMA.get() {
         existing
     } else {
-        let schema_path = repo_root.join("schema/boundary_object.json");
+        let schema_path = resolve_boundary_schema_path(&repo_root, None)?;
         let schema_value: Value = serde_json::from_reader(File::open(&schema_path)?)?;
         BOUNDARY_OBJECT_SCHEMA.get_or_init(move || schema_value)
     };
@@ -233,6 +234,47 @@ fn capability_catalog_schema() -> Result<()> {
             .join("\n");
         bail!("capability catalog failed schema validation:\n{details}");
     }
+
+    Ok(())
+}
+
+// Confirms the bundled boundary schema descriptor satisfies the boundary schema catalog schema.
+#[test]
+fn boundary_schema_descriptor_schema() -> Result<()> {
+    let repo_root = repo_root();
+    let schema_path = repo_root.join("schema/boundary_object_schema.json");
+    let catalog_path = repo_root.join(DEFAULT_BOUNDARY_SCHEMA_CATALOG_PATH);
+
+    static BOUNDARY_SCHEMA_SCHEMA: OnceLock<Value> = OnceLock::new();
+    let schema_value = if let Some(existing) = BOUNDARY_SCHEMA_SCHEMA.get() {
+        existing
+    } else {
+        let loaded: Value = serde_json::from_reader(File::open(&schema_path)?)?;
+        BOUNDARY_SCHEMA_SCHEMA.get_or_init(move || loaded)
+    };
+    let catalog_value: Value = serde_json::from_reader(File::open(&catalog_path)?)?;
+
+    let compiled = JSONSchema::compile(schema_value)?;
+    if let Err(errors) = compiled.validate(&catalog_value) {
+        let details = errors
+            .map(|err| err.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        bail!("boundary schema catalog failed validation:\n{details}");
+    }
+
+    let descriptor = BoundarySchemaCatalog::load(&catalog_path)?;
+    let resolved = descriptor.schema.schema_path(&repo_root);
+    assert!(
+        resolved.is_file(),
+        "schema path {} should exist",
+        resolved.display()
+    );
+    assert_eq!(
+        descriptor.schema.key,
+        BoundarySchema::load(&resolved)?.schema_version(),
+        "descriptor key should match schema_version from the boundary schema"
+    );
 
     Ok(())
 }
@@ -2307,7 +2349,8 @@ fn boundary_schema_version() -> String {
     static VERSION: OnceLock<String> = OnceLock::new();
     VERSION
         .get_or_init(|| {
-            let path = repo_root().join(DEFAULT_BOUNDARY_SCHEMA_PATH);
+            let path = resolve_boundary_schema_path(&repo_root(), None)
+                .expect("resolve boundary schema path");
             BoundarySchema::load(&path)
                 .expect("load boundary schema")
                 .schema_version()
