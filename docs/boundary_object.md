@@ -1,14 +1,11 @@
 # Probe Contract and Boundary Objects (boundary_event_v1 pattern)
 
 `probe` records every probe run as a versioned JSON boundary object. The
-structure comes from the **boundary_event_v1** pattern at
-`schema/boundary_object_schema.json`. Instances are selected by
-**boundary_schema_v1** descriptors such as `catalogs/cfbo-v1.json`, which
-declare:
-
-- the boundary schema key (`schema_key`, e.g., `cfbo-v1`),
-- the pattern version they expect (`pattern_version`, e.g., `boundary_event_v1`),
-- and the path to the shared pattern (`schema_path`).
+structure comes from the **boundary_event_v1** schema embedded in the default
+descriptor `catalogs/cfbo-v1.json`. Descriptors follow the contract in
+`schema/boundary_object_schema.json`: they declare the boundary schema key
+(`schema_key`, e.g., `cfbo-v1`) and embed the boundary-event JSON Schema used to
+validate emitted records.
 
 Each boundary object captures *one* probe execution in one run mode. Probes are
 tiny scripts stored under `probes/<probe_id>.sh` that:
@@ -29,29 +26,29 @@ See `probes/AGENTS.md` for the workflow details expected from probe authors.
 
 The project commits to the boundary_event_v1 pattern as specified by:
 
-- The canonical boundary-event JSON schema at `schema/boundary_object_schema.json`
-  (`schema_version: "boundary_event_v1"`).
-- Boundary schema descriptors under `catalogs/` (defaults recorded in
-  `catalogs/defaults.json`, initially `catalogs/cfbo-v1.json`)
-  that use `schema_version: "boundary_schema_v1"` to name the active
-  `schema_key`, declare a `pattern_version`, and point at the canonical pattern.
+- The descriptor contract at `schema/boundary_object_schema.json` (shape of
+  boundary descriptors: `key`, metadata, embedded `boundary_schema`).
+- Boundary schema descriptors under `catalogs/` (default `catalogs/cfbo-v1.json`)
+  that embed the boundary-event JSON Schema (`schema_version: "boundary_event_v1"`,
+  key `"cfbo-v1"`).
 - This document’s field-by-field explanations.
 
 Within boundary_event_v1, the required fields, field names, and semantics
 described below are stable. Structural changes require a new pattern version
 and matching documentation/tests. Adding a new schema key for the same pattern
-only requires a new descriptor that points at the existing pattern file.
+only requires a new descriptor that embeds the schema for that key.
 
 ## Boundary object layout (boundary_event_v1 + schema_key)
 
-The machine-readable definition lives in `schema/boundary_object_schema.json`
-(referenced by `catalogs/cfbo-v1.json`) and is enforced by `bin/emit-record`.
+The machine-readable definition lives under `catalogs/cfbo-v1.json` as
+`boundary_schema` (validated by `schema/boundary_object_schema.json`) and is
+enforced by `bin/emit-record`.
 
 | Field | Required | Description |
 | --- | --- | --- |
 | `schema_version` | yes | Always `"boundary_event_v1"` (the pattern version). |
 | `schema_key` | yes | Boundary schema key from the descriptor (e.g., `cfbo-v1`). |
-| `capabilities_schema_version` | yes | The catalog key from the loaded capability catalog. It is a string with no whitespace such as `macOS_codex_v1`. |
+| `capabilities_schema_version` | yes | The catalog key from the loaded capability catalog. It is a string with no whitespace (e.g., `example_catalog_key`). |
 | `stack` | yes | Sandbox/OS fingerprint for the host that ran the probe. |
 | `probe` | yes | Identity and capability linkage for the probe implementation. |
 | `run` | yes | Execution metadata for this invocation (mode, workspace, command). This harness intentionally omits timestamps so records stay stateless. |
@@ -157,7 +154,7 @@ workspace and expects a denial):
 {
   "schema_version": "boundary_event_v1",
   "schema_key": "cfbo-v1",
-  "capabilities_schema_version": "macOS_codex_v1",
+  "capabilities_schema_version": "example_catalog_key",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",
@@ -206,17 +203,18 @@ workspace and expects a denial):
 
 When the boundary-object contract needs to change, follow this procedure:
 
-1. For structural changes, introduce a new pattern version in
-   `schema/boundary_object_schema.json` (and update `pattern_version` in any
-   descriptors that target it). Keep prior patterns available for consumers
-   that still need them.
-2. For a new boundary schema key using the same pattern, add a new
-   `boundary_schema_v1` descriptor under `catalogs/` with its own `key`,
-   `pattern_version`, and `schema_path` pointing at the canonical pattern file.
+1. For structural changes to the boundary-event schema, embed the new schema
+   (with a new `schema_version`) in a new descriptor under `catalogs/` and
+   update `schema/boundary_object_schema.json` only if the descriptor *shape*
+   changes. Keep prior descriptors available for consumers that still need
+   them.
+2. For a new boundary schema key using the same pattern version, add a new
+   descriptor under `catalogs/` with its own `key` and embedded schema for that
+   key.
 3. Update this document, `AGENTS.md`, `README.md`, probe docs, and any tooling
    (`bin/emit-record`, tests, listeners) that validates or emits boundary
    objects so the new pattern and descriptors remain in lockstep.
 4. Use `--boundary` (or `BOUNDARY_PATH`) to validate or emit against a drop-in
    descriptor when experimenting with new schema keys or pattern versions. The
-   `schema_version` in emitted records reflects the pattern version; the
-   `schema_key` reflects the descriptor key.
+   `schema_version` in emitted records reflects the embedded pattern version;
+   the `schema_key` reflects the descriptor key.

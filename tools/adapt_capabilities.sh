@@ -13,27 +13,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)
 repo_root=$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)
 expected_schema_version="sandbox_catalog_v1"
 adapter_name="adapt_capabilities"
-defaults_manifest="${repo_root}/catalogs/defaults.json"
 json_extract_bin="${repo_root}/bin/json-extract"
-
-resolve_default_descriptor_path() {
-  local key="$1"
-  local fallback="$2"
-  local value=""
-  if [[ -f "${defaults_manifest}" && -x "${json_extract_bin}" ]]; then
-    value=$("${json_extract_bin}" --file "${defaults_manifest}" --pointer "/${key}" --type string --default "" 2>/dev/null || true)
-  fi
-  if [[ -n "${value}" ]]; then
-    value="${value#./}"
-    if [[ "${value}" == /* ]]; then
-      printf '%s\n' "${value}"
-    else
-      printf '%s\n' "${repo_root}/${value}"
-    fi
-  else
-    printf '%s\n' "${fallback}"
-  fi
-}
 
 if [[ ! -x "${json_extract_bin}" ]]; then
   echo "${adapter_name}: missing json-extract helper at ${json_extract_bin}" >&2
@@ -41,7 +21,7 @@ if [[ ! -x "${json_extract_bin}" ]]; then
 fi
 
 # Allow callers to override the default catalog path (useful for tests).
-capabilities_file="${1:-$(resolve_default_descriptor_path "catalog" "${repo_root}/catalogs/macos_codex_v1.json")}"
+capabilities_file="${1:-${CATALOG_PATH:-${repo_root}/catalogs/macos_codex_v1.json}}"
 
 if [[ ! -f "${capabilities_file}" ]]; then
   echo "${adapter_name}: unable to find capabilities.json at ${capabilities_file}" >&2

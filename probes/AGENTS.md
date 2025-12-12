@@ -5,12 +5,13 @@ This directory contains probes: small programs built to test validated capabilit
 ## Probe Author contract
 
 As the Probe Author, you:
-- Use the capability catalog in `catalogs/macos_codex_v1.json` to select accurate
-  `primary_capability_id` values. `bin/emit-record` validates IDs, so use the
-  exact slugs defined in that file.
+- Use the active capability catalog (defaults to the bundled
+  `catalogs/macos_codex_v1.json`, or whatever `--catalog` / `CATALOG_PATH`
+  points to) to select accurate `primary_capability_id` values.
+  `bin/emit-record` validates IDs, so use the exact slugs defined in that file.
 - Read the active boundary schema descriptor (defaults resolve from
-  `catalogs/defaults.json`, initially `catalogs/cfbo-v1.json`,
-  which points at `schema/boundary_object_schema.json`) alongside
+  the bundled `catalogs/cfbo-v1.json`,
+  validated by `schema/boundary_object_schema.json`) alongside
   `docs/boundary_object.md` to understand every field the probe must provide.
 - Review existing probes under `probes/` to see which behaviors already have
   coverage and how outcomes are classified.
@@ -57,7 +58,7 @@ invalid args, 2 internal error, 3 timeout). Keep helper CLIs small and
 capability-aligned so their behavior is easy to reason about from the probe and
 its README.
 
-## Probe description and agent guidance (boundary_event_v1 + cfbo-v1 schema key)
+## Probe description and agent guidance (boundary_event_v1 + boundary schema key)
 
 A probe:
 1. Is an executable script under `probes/<probe_id>.sh`, where the filename
@@ -133,7 +134,7 @@ Matching JSON output (trimmed for brevity):
 {
   "schema_version": "boundary_event_v1",
   "schema_key": "cfbo-v1",
-  "capabilities_schema_version": "macOS_codex_v1",
+  "capabilities_schema_version": "example_catalog_key",
   "probe": {
     "id": "fs_outside_workspace",
     "version": "1",

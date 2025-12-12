@@ -6,12 +6,10 @@
 //! keep behavior aligned with the narrative in README.md and docs/*.md.
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -44,7 +42,6 @@ const ROOT_SENTINEL: &str = "bin/.gitkeep";
 const MAKEFILE: &str = "Makefile";
 const ENV_CATALOG_PATH: &str = "CATALOG_PATH";
 const ENV_BOUNDARY_SCHEMA_PATH: &str = "BOUNDARY_PATH";
-const DEFAULTS_MANIFEST_PATH: &str = "catalogs/defaults.json";
 pub const DEFAULT_BOUNDARY_SCHEMA_PATH: &str = "catalogs/cfbo-v1.json";
 pub const CANONICAL_BOUNDARY_SCHEMA_PATH: &str = "schema/boundary_object_schema.json";
 
@@ -118,7 +115,7 @@ pub fn resolve_catalog_path(repo_root: &Path, cli_override: Option<&Path>) -> Pa
     resolve_repo_data_path(repo_root, cli_override, ENV_CATALOG_PATH, &default_catalog)
 }
 
-/// Resolve the boundary-object schema path using CLI/env overrides or the default.
+/// Resolve the boundary descriptor path using CLI/env overrides or the default.
 pub fn resolve_boundary_schema_path(
     repo_root: &Path,
     cli_override: Option<&Path>,
@@ -167,38 +164,22 @@ fn repo_relative(repo_root: &Path, candidate: &Path) -> PathBuf {
     }
 }
 
-/// Return the default capability catalog descriptor, honoring `catalogs/defaults.json` when present.
+/// Return the default capability catalog descriptor.
 pub fn default_catalog_path(repo_root: &Path) -> PathBuf {
-    default_descriptor_paths(repo_root).catalog
+    repo_root.join(DEFAULT_CATALOG_PATH)
 }
 
-/// Return the default boundary descriptor, honoring `catalogs/defaults.json` when present.
+/// Return the default boundary descriptor.
 pub fn default_boundary_descriptor_path(repo_root: &Path) -> PathBuf {
-    default_descriptor_paths(repo_root).boundary
+    repo_root.join(DEFAULT_BOUNDARY_SCHEMA_PATH)
 }
 
-/// Resolve default descriptors from `catalogs/defaults.json`, falling back to baked-in paths.
+/// Resolve default descriptors from baked-in paths.
 pub fn default_descriptor_paths(repo_root: &Path) -> DefaultDescriptorPaths {
-    load_defaults_manifest(repo_root).unwrap_or_else(|| DefaultDescriptorPaths {
+    DefaultDescriptorPaths {
         catalog: repo_root.join(DEFAULT_CATALOG_PATH),
         boundary: repo_root.join(DEFAULT_BOUNDARY_SCHEMA_PATH),
-    })
-}
-
-fn load_defaults_manifest(repo_root: &Path) -> Option<DefaultDescriptorPaths> {
-    let manifest_path = repo_root.join(DEFAULTS_MANIFEST_PATH);
-    let contents = fs::read_to_string(&manifest_path).ok()?;
-    let parsed: DefaultsManifest = serde_json::from_str(&contents).ok()?;
-    Some(DefaultDescriptorPaths {
-        catalog: repo_relative(repo_root, Path::new(&parsed.catalog)),
-        boundary: repo_relative(repo_root, Path::new(&parsed.boundary)),
-    })
-}
-
-#[derive(Deserialize)]
-struct DefaultsManifest {
-    catalog: String,
-    boundary: String,
+    }
 }
 
 /// Resolve another helper binary within the same repo.
@@ -406,8 +387,8 @@ mod tests {
     fn sample_record_json() -> serde_json::Value {
         json!({
             "schema_version": "boundary_event_v1",
-            "schema_key": "cfbo-v1",
-            "capabilities_schema_version": "macOS_codex_v1",
+            "schema_key": "example_boundary_key",
+            "capabilities_schema_version": "example_catalog_key",
             "stack": {
                 "sandbox_mode": null,
                 "os": "Darwin"

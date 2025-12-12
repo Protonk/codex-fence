@@ -53,6 +53,10 @@ The primary entry point is the `probe` binary (synced into `bin/probe`).
   print a human‑readable summary. This is a text‑only viewer; it never changes
   the underlying JSON.
 
+- `schema-validate`  
+  Validate JSON as a catalog (`--mode catalog`) or boundary (`--mode boundary`)
+  against the bundled schemas or paths provided via `--catalog` / `--boundary`.
+
 
 ## Probes: how you measure a sandbox
 
@@ -85,25 +89,24 @@ Two JSON schemas define how data flows through Fencerunner:
   `catalogs/macos_codex_v1.json` and is keyed by `catalog.key` (the
   `capabilities_schema_version` echoed into boundary objects).
 
-- **Boundary object pattern (boundary_event_v1)**  
-  The canonical boundary-event pattern lives at
-  `schema/boundary_object_schema.json` (`schema_version: "boundary_event_v1"`).
-  Boundary schema descriptors under `catalogs/` (default: `catalogs/cfbo-v1.json`)
-  use `schema_version: "boundary_schema_v1"` to declare a `schema_key`,
-  `pattern_version`, and `schema_path` pointing at the pattern file.
-  `docs/boundary_object.md` walks each field and explains evolution rules.
+- **Boundary descriptor contract + embedded boundary schema**  
+  `schema/boundary_object_schema.json` describes the shape of boundary schema
+  descriptors (key + embedded boundary-event schema). The bundled descriptor
+  `catalogs/cfbo-v1.json` carries a boundary-event schema inline; emitted
+  records carry its `schema_version` (e.g., `"boundary_event_v1"`) and
+  `schema_key` (e.g., `"cfbo-v1"`). `docs/boundary_object.md` walks each field
+  and explains evolution rules.
 
 The harness always requires a catalog and a boundary schema, but you can swap
 them out without changing code:
 
 - Use `--catalog <path>` or `CATALOG_PATH` to point helpers at a different
-  catalog file. Default catalog/boundary descriptors are declared in
-  `catalogs/defaults.json` (initially `catalogs/macos_codex_v1.json` and
-  `catalogs/cfbo-v1.json`).
+  catalog file. Defaults fall back to the bundled `catalogs/macos_codex_v1.json`
+  and `catalogs/cfbo-v1.json` when no overrides are provided.
 - Use `--boundary <path>` or `BOUNDARY_PATH` to point helpers at an alternate
-  boundary descriptor. Defaults resolve from `catalogs/defaults.json` and point
-  at `schema/boundary_object_schema.json`; emitted records carry
-  `schema_version: "boundary_event_v1"` plus `schema_key` from the descriptor.
+  boundary descriptor. Defaults resolve to the bundled descriptor; emitted
+  records carry the `schema_version` and `schema_key` declared by that
+  descriptor’s embedded boundary schema.
 
 The Rust layer (`src/catalog`, `src/boundary`) validates catalogs and boundary
 objects at load and emit time, and the integration tests under `tests/suite.rs`

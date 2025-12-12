@@ -100,7 +100,7 @@ fn validate_schema_version(schema_version: &str) -> Result<()> {
     Ok(())
 }
 
-fn allowed_schema_versions() -> BTreeSet<String> {
+pub fn allowed_schema_versions() -> BTreeSet<String> {
     BTreeSet::from_iter([default_catalog_schema_version()])
 }
 
@@ -211,20 +211,12 @@ fn validate_against_schema(catalog_path: &Path) -> Result<()> {
     let catalog_value: Value = serde_json::from_reader(BufReader::new(catalog_file))
         .with_context(|| format!("parsing catalog {}", catalog_path.display()))?;
 
-    let catalog_version = catalog_value
-        .get("schema_version")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
-
     let schema_path = resolve_catalog_schema_path(catalog_path);
     let allowed = allowed_schema_versions();
     let schema = load_json_schema(
         &schema_path,
         SchemaLoadOptions {
             allowed_versions: Some(&allowed),
-            expected_version: Some(&catalog_version),
-            patch_schema_version_const: true,
             ..Default::default()
         },
     )

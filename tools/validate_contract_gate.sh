@@ -31,7 +31,6 @@ maybe_exec_fence_test() {
 paths_helper="${repo_root}/tools/resolve_paths.sh"
 modes_helper="${repo_root}/tools/list_run_modes.sh"
 fence_run_bin="${repo_root}/bin/probe-exec"
-defaults_manifest="${repo_root}/catalogs/defaults.json"
 
 if [[ ! -f "${paths_helper}" ]]; then
   echo "${gate_name}: missing path helper at ${paths_helper}" >&2
@@ -686,33 +685,8 @@ run_dynamic_gate() {
   local path_prefix="${shadow_root}/bin:${PATH}"
 
   local default_catalog="${repo_root}/catalogs/macos_codex_v1.json"
-  if [[ -f "${defaults_manifest}" && -x "${json_extract_bin}" ]]; then
-    local manifest_catalog
-    manifest_catalog=$("${json_extract_bin}" --file "${defaults_manifest}" --pointer "/catalog" --type string --default "" 2>/dev/null || true)
-    if [[ -n "${manifest_catalog}" ]]; then
-      manifest_catalog="${manifest_catalog#./}"
-      if [[ "${manifest_catalog}" == /* ]]; then
-        default_catalog="${manifest_catalog}"
-      else
-        default_catalog="${repo_root}/${manifest_catalog}"
-      fi
-    fi
-  fi
-
   local default_boundary="${repo_root}/catalogs/cfbo-v1.json"
-  if [[ -f "${defaults_manifest}" && -x "${json_extract_bin}" ]]; then
-    local manifest_boundary
-    manifest_boundary=$("${json_extract_bin}" --file "${defaults_manifest}" --pointer "/boundary" --type string --default "" 2>/dev/null || true)
-    if [[ -n "${manifest_boundary}" ]]; then
-      manifest_boundary="${manifest_boundary#./}"
-      if [[ "${manifest_boundary}" == /* ]]; then
-        default_boundary="${manifest_boundary}"
-      else
-        default_boundary="${repo_root}/${manifest_boundary}"
-      fi
-    fi
-  fi
-  local catalog_path="${capabilities_json:-${default_catalog}}"
+  local catalog_path="${capabilities_json:-${CATALOG_PATH:-${default_catalog}}}"
   local adapter_path="${capabilities_adapter:-${repo_root}/tools/adapt_capabilities.sh}"
   local boundary_path="${BOUNDARY_PATH:-${default_boundary}}"
 

@@ -15,11 +15,12 @@ Use this file before you read or edit anything in `docs/`.
 1. Start with the project root `README.md` if you need the big picture: why `probe` exists, what a “probe” is, and how the harness runs.
 2. Treat everything in `docs/` as *explanatory lenses* over:
    - `schema/capability_catalog.schema.json` + `catalogs/*.json` (capability map, versioned)
-   - `schema/boundary_object_schema.json` (canonical boundary-event pattern) referenced by the bundled descriptor `catalogs/cfbo-v1.json`
+   - `schema/boundary_object_schema.json` (boundary descriptor contract) used to validate the bundled descriptor `catalogs/cfbo-v1.json`, which embeds a boundary-event schema
    - the probe authoring contracts in `probes/AGENTS.md`
    - the test harness described in `tests/AGENTS.md`
-3. Helper binaries accept drop-in artifacts: use `--catalog` / `CATALOG_PATH` plus `--boundary` / `BOUNDARY_PATH` to point at alternate boundary descriptors. Defaults resolve from `catalogs/defaults.json` (initially `catalogs/macos_codex_v1.json` and `catalogs/cfbo-v1.json`) and point to the canonical `schema/boundary_object_schema.json`.
-3. When documentation and machine artifacts disagree, the machine artifacts win. Fix the docs to match the schema/tests, not the other way around.
+3. Helper binaries accept drop-in artifacts: use `--catalog` / `CATALOG_PATH` plus `--boundary` / `BOUNDARY_PATH` to point at alternate boundary descriptors. Defaults fall back to the bundled `catalogs/macos_codex_v1.json` and `catalogs/cfbo-v1.json` and validate boundary descriptors against `schema/boundary_object_schema.json`.
+4. When documentation and machine artifacts disagree, the machine artifacts win. Fix the docs to match the schema/tests, not the other way around.
+5. To sanity-check a catalog or boundary descriptor directly, use `schema-validate --mode catalog|boundary` with `--catalog` / `--boundary` overrides as needed.
 
 If you are a model-based agent: prefer reading the JSON schemas and `AGENTS.md` contracts in other directories when you need normative rules. Use these docs to understand structure and intent.
 
@@ -68,14 +69,14 @@ The authoritative probe-author contract lives in `probes/AGENTS.md` and the test
 **Role**
 
 Documents the boundary-event pattern (boundary_event_v1) and the default schema
-descriptor (`cfbo-v1`):
+descriptor (e.g., `cfbo-v1`, which embeds that pattern):
 
 - Explains how each probe run is captured as a JSON record.
 - Walks each top-level field (`schema_version`, `capabilities_schema_version`, `stack`, `probe`, `run`, `operation`, `result`, `payload`, `capability_context`).
 - Clarifies how `observed_result` should be interpreted and how payloads should remain small and structured.
 - Describes the expected evolution path when the contract changes (new schema version, migration expectations, etc.).
 
-The machine-readable contract is `schema/boundary_object_schema.json` (canonical) referenced by the bundled descriptor under `catalogs/` (default `catalogs/cfbo-v1.json`). Validation happens in `bin/emit-record` and the test suite; runtime rejects drift between the canonical schema and the bundled reference.
+The machine-readable descriptor contract is `schema/boundary_object_schema.json` (validates the descriptor shape). The bundled descriptor under `catalogs/` (default `catalogs/cfbo-v1.json`) embeds the boundary-event schema used at runtime. Validation happens in `bin/emit-record` and the test suite; runtime rejects descriptors that fail the contract or embedded schemas that fail validation.
 
 **Read this if**
 
@@ -86,8 +87,8 @@ The machine-readable contract is `schema/boundary_object_schema.json` (canonical
 **Before you change it**
 
 - Follow the “Updating the commitments” section at the end of this file:
-  - Introduce a new schema file when breaking changes are needed.
-  - Update `schema/boundary_object_schema.json` (and mirror it under `catalogs/` with a new descriptor if you add a new schema key).
+  - Introduce a new descriptor file (with embedded schema) when breaking changes are needed.
+  - Update `schema/boundary_object_schema.json` (descriptor contract) if the descriptor shape changes.
   - Refresh references in `AGENTS.md`, `README.md`, probe docs, and tests.
 - Never silently remove or repurpose fields without updating:
   - the schema,

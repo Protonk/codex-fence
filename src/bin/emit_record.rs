@@ -65,9 +65,8 @@ fn run() -> Result<()> {
 
     let stack_raw = run_command_json(&detect_stack, &[&args.run_mode])
         .with_context(|| format!("Failed to execute {}", detect_stack.display()))?;
-    let stack: StackInfo = serde_json::from_value(stack_raw.clone()).context(
-        "detect-stack emitted JSON that does not match the current stack schema",
-    )?;
+    let stack: StackInfo = serde_json::from_value(stack_raw.clone())
+        .context("detect-stack emitted JSON that does not match the current stack schema")?;
     let stack_json = serde_json::to_value(stack)?;
 
     let workspace_root = resolve_workspace_root()?;

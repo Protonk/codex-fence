@@ -23,9 +23,10 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
   in the payload and status.
 - **Capabilities:** Every probe declares exactly one
   `primary_capability_id` (with optional `secondary_capability_ids`). The ids
-  come from the capability catalog (`catalogs/macos_codex_v1.json` by default)
-  and are validated at emit time through the Rust capability index (the legacy
-  adapter in `tools/adapt_capabilities.sh` remains for automation).
+  come from the active capability catalog (bundled `catalogs/macos_codex_v1.json`
+  by default, or whatever `--catalog` / `CATALOG_PATH` points to) and are
+  validated at emit time through the Rust capability index (the legacy adapter
+  in `tools/adapt_capabilities.sh` remains for automation).
 - **Helpers:** Prefer the compiled helpers in `bin/` over ad-hoc logic.
   Path canonicalization routes through `bin/portable-path`; JSON extraction
   (when you must parse another program’s JSON) goes through `bin/json-extract`.
@@ -52,10 +53,9 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
 ## What a probe emits
 
 Every probe emits one [boundary object](boundary_object.md) that conforms to
-the active boundary-object schema (defaults resolve from
-`catalogs/defaults.json`, initially the `cfbo-v1` descriptor in `catalogs/`,
-which points to the canonical `schema/boundary_object_schema.json` pattern and
-carries `schema_key: "cfbo-v1"`). Required data includes:
+the active boundary-object schema (defaults resolve to the bundled descriptor
+in `catalogs/`, which embeds the boundary-event schema and declares a
+`schema_key`). Required data includes:
 
 - Probe identity (`probe.id`, `probe.version`,
   `probe.primary_capability_id`, `probe.secondary_capability_ids`).

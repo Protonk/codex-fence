@@ -10,10 +10,10 @@ share runtime helpers with the binaries under `src/bin/`.
 - `lib.rs` — entry point and glue. Owns repo/root detection, helper resolution,
   and the small helper APIs the binaries depend on. Keep public surface small
   and documented here or in the target module.
-- `boundary/` — boundary-event types and serde. Schema changes start in
-  `schema/boundary_object_schema.json` (canonical pattern) and the bundled
-  descriptor under `catalogs/` (default: `cfbo-v1.json`), then land here with
-  tests.
+- `boundary/` — boundary-event types and serde. Schema changes start in the
+  descriptor contract `schema/boundary_object_schema.json` and the bundled
+  descriptor under `catalogs/` (default: `cfbo-v1.json`, which embeds the
+  boundary-event schema), then land here with tests.
 - `catalog/` — capability catalog parsing and indexing. Pure Rust; no shelling
   out. Must stay aligned with `schema/capability_catalog.schema.json` and the
   bundled catalogs under `catalogs/`.

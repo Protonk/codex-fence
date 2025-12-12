@@ -4,7 +4,7 @@ This document summarizes the structure of the capability catalog schema and the 
 
 > NOTE: This document exists to help agents understand the structure of the catalog, NOT to provide additional technical or policy information.
 
-The catalog schema lives at `schema/capability_catalog.schema.json` (current schema version: **sandbox_catalog_v1**). The bundled catalog instance is stored at `catalogs/macos_codex_v1.json` (catalog key: **macOS_codex_v1**) and can be swapped for another catalog without code changes. Defaults for catalogs/boundary descriptors are recorded in `catalogs/defaults.json`.
+The catalog schema lives at `schema/capability_catalog.schema.json` (current schema version: **sandbox_catalog_v1**). The bundled catalog instance is stored at `catalogs/macos_codex_v1.json` (catalog key: **macOS_codex_v1**) and can be swapped for another catalog without code changes. CLI/env overrides (`--catalog` / `CATALOG_PATH`) select alternates; otherwise the bundled catalog is used.
 
 ## Catalog keys and repositories
 

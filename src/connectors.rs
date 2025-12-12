@@ -43,11 +43,7 @@ impl RunMode {
         Ok(())
     }
 
-    fn command_spec(
-        &self,
-        _platform: Option<&str>,
-        probe_path: &Path,
-    ) -> Result<CommandSpec> {
+    fn command_spec(&self, _platform: Option<&str>, probe_path: &Path) -> Result<CommandSpec> {
         let probe_arg = probe_path.as_os_str().to_os_string();
         match self {
             RunMode::Baseline => Ok(CommandSpec {
@@ -56,7 +52,6 @@ impl RunMode {
             }),
         }
     }
-
 }
 
 impl TryFrom<&str> for RunMode {

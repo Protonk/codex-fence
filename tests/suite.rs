@@ -30,7 +30,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use support::{helper_binary, make_executable, repo_root, run_command};
 use tempfile::{NamedTempFile, TempDir};
 
@@ -239,46 +239,43 @@ fn capability_catalog_schema() -> Result<()> {
     Ok(())
 }
 
-// Confirms the bundled boundary schema descriptor embeds the canonical schema.
+// Confirms the bundled boundary schema descriptor satisfies the descriptor contract
+// and exposes the expected embedded schema metadata.
 #[test]
-fn boundary_schema_matches_canonical() -> Result<()> {
+fn boundary_schema_matches_contract() -> Result<()> {
     let repo_root = repo_root();
     let descriptor_path = default_boundary_descriptor_path(&repo_root);
     let canonical_path = repo_root.join(CANONICAL_BOUNDARY_SCHEMA_PATH);
 
     let descriptor_value: Value = serde_json::from_reader(File::open(&descriptor_path)?)?;
-    assert!(
-        descriptor_value.get("schema").is_none(),
-        "boundary descriptor should defer to the canonical schema file"
-    );
+    let contract_value: Value = serde_json::from_reader(File::open(&canonical_path)?)?;
 
-    let schema_path = descriptor_value
-        .get("schema_path")
-        .and_then(Value::as_str)
-        .context("schema_path missing from boundary descriptor")?;
-    let resolved_schema = descriptor_path
-        .parent()
-        .unwrap_or(&repo_root)
-        .join(schema_path)
-        .canonicalize()
-        .context("canonicalizing schema_path from boundary descriptor")?;
-    assert_eq!(
-        resolved_schema,
-        canonical_path.canonicalize()?,
-        "boundary descriptor should point at the canonical schema"
+    let contract_arc = Arc::new(contract_value);
+    let contract_static: &'static Value = unsafe { &*(Arc::as_ptr(&contract_arc)) };
+    let compiled_contract = JSONSchema::compile(contract_static)?;
+    if let Err(errors) = compiled_contract.validate(&descriptor_value) {
+        let details = errors
+            .map(|err| err.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        bail!("boundary descriptor failed contract validation:\n{details}");
+    }
+
+    assert!(
+        descriptor_value.get("boundary_schema").is_some(),
+        "boundary descriptor should embed a boundary_schema"
     );
 
     let descriptor_schema = BoundarySchema::load(&descriptor_path)?;
-    let canonical_schema = BoundarySchema::load(&canonical_path)?;
     assert_eq!(
-        descriptor_schema.schema_version(),
-        canonical_schema.schema_version(),
-        "descriptor and canonical schema should expose the same version"
+        descriptor_schema.schema_key(),
+        Some("cfbo-v1"),
+        "descriptor should surface its schema key"
     );
     assert_eq!(
-        descriptor_schema.raw_schema(),
-        canonical_schema.raw_schema(),
-        "descriptor and canonical schema should compile the same payload"
+        descriptor_schema.schema_version(),
+        "boundary_event_v1",
+        "descriptor should expose the embedded boundary-event version"
     );
     Ok(())
 }

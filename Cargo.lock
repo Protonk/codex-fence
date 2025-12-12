@@ -272,6 +272,7 @@ name = "fencerunner"
 version = "0.6.0"
 dependencies = [
  "anyhow",
+ "clap",
  "jsonschema",
  "libc",
  "serde",
