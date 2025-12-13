@@ -16,7 +16,7 @@ As the Probe Author, you:
 - Review existing probes under `probes/` to see which behaviors already have
   coverage and how outcomes are classified.
 - Keep a tight edit/test loop. While iterating on a script, run the contract
-  gate (`bin/probe-contract-gate probes/<id>.sh`). This is a quick-fail static
+  gate (`bin/probe-contract-gate --probe <id|path>`). This is a quick-fail static
   and dynamic probe tester designed for rapid use.
 
 Keep each probe:
@@ -27,8 +27,8 @@ Keep each probe:
   operation args with `bin/emit-record` flags (`--payload-stdout/-stderr`,
   `--payload-raw-field[-json|-list|-null]`, `--operation-arg[...]`) instead of
   constructing JSON manually. Include `--run-mode "$FENCE_RUN_MODE"` so
-  emitted records capture the active mode (`probe-exec` exports both
-  `FENCE_*` and legacy `FENCE_*` names).
+  emitted records capture the active mode (`bin/probe-exec` exports
+  `FENCE_RUN_MODE` and related `FENCE_*` metadata).
 - Clearly labeled with `primary_capability_id`. Choose the best match from the
   catalog and optionally list related capabilities in
   `secondary_capability_ids`. `bin/emit-record` enforces these IDs.
@@ -50,7 +50,7 @@ about coverage without depending on directory names.
 ## Using compiled helpers from probes
 
 Probes may delegate narrowly scoped work to compiled helpers under
-`probe-runtime/` (synced into `bin/` by `make build`). Keep the probe as the
+`bin/` (synced from `src/bin/` by `make build`). Keep the probe as the
 orchestrator: pass explicit arguments, enforce a timeout, and still emit the
 single JSON record via `bin/emit-record`. Helpers must stay quiet on stdout,
 run in the foreground, and use stable, documented exit codes (0 success, 1

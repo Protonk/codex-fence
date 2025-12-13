@@ -7,8 +7,9 @@ single command now executes the entire suite.
 
 ## Mission control
 
-1. **Single entry point:** `cargo test` runs everything. There are no other
-   Rust targets or doctests, so noisy output means something regressed.
+1. **Single entry point:** `make test` rebuilds helper binaries into `bin/` and
+   then runs `cargo test`. There are no other Rust targets or doctests, so
+   noisy output means something regressed.
 2. **Board must stay green:** the suite encodes the portability + contract
    guarantees promised in `README.md`, `CONTRIBUTING.md`, and the schema docs.
    If the suite fails you either broke a contract or you discovered an existing
@@ -33,13 +34,13 @@ single command now executes the entire suite.
 
 ## Running and diagnosing tests
 
-- **Full sweep:** `cargo test`. Watch for the expected integration targets:
+- **Full sweep:** `make test` (rebuilds helpers, then runs `cargo test`). Watch for the expected integration targets:
   `schema`, `catalog`, `probe_execution`, `contracts`, `cli`, `helpers`. Anything else means someone reintroduced stray targets.
 - **Focused run:** `cargo test --test <target> <name>` (e.g.
   `cargo test --test cli fencerunner_bundle_runs_capability_subset`) to iterate on a failing case.
   Use `-- --nocapture` when you need stdout/stderr from helpers.
-- **Probe contract loop:** `tools/validate_contract_gate.sh --probe <id>` (or
-  `bin/probe-contract-gate <id>`) is still the fastest way to vet a single probe. The
+- **Probe contract loop:** `tools/validate_contract_gate.sh --probe <id|path>` (or
+  `bin/probe-contract-gate --probe <id|path>`) is still the fastest way to vet a single probe. The
   integration suite asserts those gates stay wired up.
 - **Schema debugging:** the `boundary_object_schema` test writes the failing JSON
   payload to `tmp/` with the test name. Open that file before re-running to see
@@ -90,8 +91,8 @@ contract without an obvious row, add both the row and the tests.
   so rebuild those if they drift.
 - **Workspace/path issues:** rerun the failing test with `RUST_LOG=debug` to see
   the path planning traces emitted by `fence_run_support`.
-- **Probe contract gates:** run `tools/validate_contract_gate.sh --probe <id>`,
-  `probe-gate --probe <id>`, or `bin/probe-contract-gate <id>` to gate the
+- **Probe contract gates:** run `tools/validate_contract_gate.sh --probe <id|path>`,
+  `bin/probe-gate --probe <id|path>`, or `bin/probe-contract-gate --probe <id|path>` to gate the
   offending script. Edit in a tight loop until the probe passes the contract
   gate--only then do you run the full suite.
 

@@ -9,7 +9,7 @@ This directory hosts helpers for automated agents.
 - `resolve_paths.sh`: canonicalizes probe paths and exports the `resolve_probe_script_path` + `portable_realpath` helpers shared by the contract tools.
 - `list_run_modes.sh`: canonical list + parser for supported run modes.
 
-## Modfiying tooling
+## Modifying tooling
 Before changing or adding tooling:
 - Mirror the existing safety posture: every script sets `set -euo pipefail`,
   resolves `repo_root`, and fails fast if prerequisites are absent.

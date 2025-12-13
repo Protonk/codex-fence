@@ -105,8 +105,8 @@ this probe obey the contract?” regardless of how the answer is computed.
   `tools/validate_contract_gate.sh` from `bin/`, so external tooling can call
   the gate without knowing the layout under `tools/`.
 - `bin/probe-gate` (`src/bin/probe_gate.rs`) is a Rust shim used by the
-  test suite; `cargo test --test suite` shells out to it so the gate runs as
-  part of the normal test loop.
+  test suite; `make test` (or `cargo test --test contracts`) shells out to it so
+  the gate runs as part of the normal test loop.
 
 When you are authoring or reviewing a probe, “running the contract gate” means
 invoking one of these entry points, not re-implementing the checks by hand.
@@ -126,11 +126,11 @@ Static gating looks only at the probe script itself. It is implemented by
 You normally run static gating via:
 
 ```sh
-tools/validate_contract_gate.sh --probe <id> --static-only
+tools/validate_contract_gate.sh --probe <id|path> --static-only
 ```
 
-or indirectly via `bin/probe-contract-gate <id>` when you only care whether the
-probe passes the full gate.
+or indirectly via `bin/probe-contract-gate --probe <id|path>` when you only care
+whether the probe passes the full gate.
 
 ### Dynamic gating
 
@@ -154,8 +154,8 @@ Use dynamic gating when you are confident the script is structurally sound and
 want to validate its behavior across modes:
 
 ```sh
-tools/validate_contract_gate.sh --probe <id> --modes "baseline"
-bin/probe-contract-gate <id>             # uses default modes
+tools/validate_contract_gate.sh --probe <id|path> --modes "baseline"
+bin/probe-contract-gate --probe <id|path>        # uses default modes
 ```
 
 ### Gating in the test loop
@@ -164,13 +164,12 @@ The fast authoring loop favors single-probe runs, but the full suite enforces
 gating on all checked-in probes:
 
 - For individual probes during development:
-  - `tools/validate_contract_gate.sh --probe <id>` to run static + dynamic
+  - `tools/validate_contract_gate.sh --probe <id|path>` to run static + dynamic
     checks for that probe.
-  - `tools/validate_contract_gate.sh --probe <id> --static-only` when you only
+  - `tools/validate_contract_gate.sh --probe <id|path> --static-only` when you only
     need quick structural feedback.
 - For the entire repository:
-  - `cargo test --test suite` exercises `bin/probe-gate`, which in turn
-    runs `tools/validate_contract_gate.sh` with no arguments so the static
-    contract gate scans every probe under `probes/`.
-  - Additional tests in `tests/suite.rs` call the gate entry points directly to
-    validate dynamic behavior and failure modes.
+  - `make test` runs the full suite, including a `bin/probe-gate` smoke that
+    runs the static contract gate over every probe under `probes/`.
+  - Tests in `tests/contracts.rs` also exercise dynamic gate behavior and
+    failure modes.
