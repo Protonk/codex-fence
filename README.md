@@ -12,7 +12,7 @@ well‑defined modes, validates their outputs against schemas and capability
 catalogs, and keeps the contract between “what probes promise” and “what
 actually ran” tight.
 
-For contributor‑focused details, see `CONTRIBUTING.md`. For contract‑level
+For contributor‑focused details, see [`CONTRIBUTING.md`](CONTRIBUTING.md). For contract‑level
 guidance, start with the AGENTS files.
 
 ## Mental model
@@ -79,28 +79,11 @@ Each probe declares:
   plus payload snippets that capture what actually happened.
 
 The probe author contract, examples, and test‑backed rules live in
-`probes/AGENTS.md`. Start there if you are writing or modifying probes.
+[`probes/AGENTS.md`](probes/AGENTS.md). Start there if you are writing or modifying probes.
 
 ## Catalogs and boundary schemas
 
-Two JSON schemas define how data flows through Fencerunner:
-
-- **Capability catalog schema**  
-  `schema/capability_catalog.schema.json` describes the shape of capability
-  catalogs. The bundled catalog instance lives in
-  `catalogs/macos_codex_v1.json` and is keyed by `catalog.key` (the
-  `capabilities_schema_version` echoed into boundary objects).
-
-- **Boundary descriptor contract + embedded boundary schema**  
-  `schema/boundary_object_schema.json` describes the shape of boundary schema
-  descriptors (key + embedded boundary-event schema). The bundled descriptor
-  `catalogs/cfbo-v1.json` carries a boundary-event schema inline; emitted
-  records carry its `schema_version` (e.g., `"boundary_event_v1"`) and
-  `schema_key` (e.g., `"cfbo-v1"`). `docs/boundary_object.md` walks each field
-  and explains evolution rules.
-
-The harness always requires a catalog and a boundary schema, but you can swap
-them out without changing code:
+Two JSON schemas define how data flows through Fencerunner. The harness always requires a catalog and a boundary schema, but you can swap them out without changing code:
 
 - Use `--catalog <path>` or `CATALOG_PATH` to point helpers at a different
   catalog file. Defaults fall back to the bundled `catalogs/macos_codex_v1.json`
@@ -116,18 +99,23 @@ assert that the schemas, helpers, and sample data stay in sync.
 
 For a narrative view of these contracts, see:
 
-- `docs/capabilities.md`
-- `docs/boundary_object.md`
-- `docs/probes.md`
+- [`docs/capabilities.md`](docs/capabilities.md)
+- [`docs/boundary_object.md`](docs/boundary_object.md)
+- [`docs/probes.md`](docs/probes.md)
 
----
+## Prerequisites
 
-## Running and developing Fencerunner
+Build:
+- A Rust toolchain with `rustc`/`cargo` >= 1.85 (see `Cargo.toml` and `Cargo.lock` for the crate set: `Cargo.toml`, `Cargo.lock`).
+- `make` and `/bin/bash` (used by the build scripts).
+- `python3` available on PATH (used by `tools/sync_bin_helpers.sh` to read the helper manifest).
 
-Prerequisites:
+Run:
+- macOS or Linux with `/bin/bash` 3.2+ and common Unix utilities (coreutils, `uname`, etc.).
+- `python3` for the bundled loopback network probe.
+- The compiled helper binaries under `bin/` (produced by `make build`); no other runtime dependencies or package installs are required.
 
-- A recent Rust toolchain (see `Cargo.toml` for the minimum version).
-- A POSIX shell environment with `/bin/bash` and common Unix tools.
+## Build and run
 
 Build the helpers into `bin/`:
 
@@ -135,66 +123,38 @@ Build the helpers into `bin/`:
 make build
 ```
 
-Run the main test suite:
-
-```sh
-make test          # rebuild helpers, then cargo test --test suite
-```
-
 Common workflows:
 
 - **Run the full probe matrix with the bundled catalog and schema**
 
   ```sh
-  bin/fencerunner --bang
+  fencerunner --bang
   ```
 
 - **Inspect results in a human‑readable form**
 
   ```sh
-  bin/fencerunner --bang | bin/fencerunner --listen
+  fencerunner --bang | fencerunner --listen
   ```
 
 - **Run a single probe by id**
 
   ```sh
-  bin/fencerunner --probe fs_outside_workspace
-  ```
-
-- **Gate a probe while authoring**
-
-  ```sh
-  tools/validate_contract_gate.sh --probe fs_outside_workspace
-  # or
-  bin/probe-contract-gate fs_outside_workspace
+  fencerunner --probe fs_outside_workspace
   ```
 
 When you change Rust code under `src/` or `src/bin/`, rebuild helpers with
 `make build` and re‑run `make test` to keep `bin/` and the test suite aligned.
 
----
-
-## Repository layout and navigation
+## Navigation
 
 The top‑level `AGENTS.md` is the router for this project: it tells you which
-directory‑specific `AGENTS.md` file to read before editing a given area. At a
-glance:
-
-- `probes/` — probe scripts and their authoring contract.
-- `schema/`, `catalogs/` — JSON schemas and catalog instances.
-- `src/` — Rust library and shared runtime logic.
-- `src/bin/` — Rust helpers that back the `fencerunner` CLI and helpers in `bin/`.
-- `tests/` — integration suite that enforces contracts.
-- `tools/` — authoring and contract‑gate tooling.
-- `docs/` — human‑readable explanations for schemas, probes, and boundary
-  objects.
+directory‑specific `AGENTS.md` file to read before editing a given area.
 
 Before you change behavior, skim:
 
-- `AGENTS.md` at the repo root,
+- [`AGENTS.md`](AGENTS.md) at the repo root,
 - the `AGENTS.md` for the directory you are touching, and
-- any relevant docs in `docs/`.
+- any relevant docs in [`docs/`](docs/).
 
-Those files explain the contracts that code and tests are expected to uphold. The tests in `tests/` are intentionally opinionated and high‑coverage: keeping
-them green is the easiest way to ensure usage remains compatible with the
-contracts described above.
+Those files explain the contracts that code and tests are expected to uphold. The tests in `tests/` are intentionally opinionated and high‑coverage: keeping them green is the easiest way to ensure usage remains compatible with the contracts described above.
