@@ -1,10 +1,10 @@
 # docs/AGENTS.md
 
-This directory contains human-readable explanations of the *contracts* that `probe` enforces elsewhere in the repo. It is here to help both humans and model-based agents understand how to interpret:
+This directory contains human-readable explanations of the *contracts* that `fencerunner` enforces elsewhere in the repo. It is here to help both humans and model-based agents understand how to interpret:
 
 - the capability catalog schema + bundled catalog (`schema/capability_catalog.schema.json`, `catalogs/*.json`)
 - probe scripts (`probes/*.sh`)
-- probe outputs (boundary objects streamed from `probe --matrix`)
+- probe outputs (boundary objects streamed from `fencerunner --bang`)
 
 The actual contracts are enforced by schemas, adapters, and tests. The documents in `docs/` must never become the primary source of truth about behavior or policy.
 
@@ -12,7 +12,7 @@ Use this file before you read or edit anything in `docs/`.
 
 ## What to know before reading these docs
 
-1. Start with the project root `README.md` if you need the big picture: why `probe` exists, what a “probe” is, and how the harness runs.
+1. Start with the project root `README.md` if you need the big picture: why `fencerunner` exists, what a “probe” is, and how the harness runs.
 2. Treat everything in `docs/` as *explanatory lenses* over:
    - `schema/capability_catalog.schema.json` + `catalogs/*.json` (capability map, versioned)
    - `schema/boundary_object_schema.json` (boundary descriptor contract) used to validate the bundled descriptor `catalogs/cfbo-v1.json`, which embeds a boundary-event schema
@@ -80,7 +80,7 @@ The machine-readable descriptor contract is `schema/boundary_object_schema.json`
 
 **Read this if**
 
-- You are interpreting streamed boundary objects (e.g., from `probe --matrix`).
+- You are interpreting streamed boundary objects (e.g., from `fencerunner --bang`).
 - You are modifying `bin/emit-record` or any adapters that build boundary objects.
 - You are adding new consumers of boundary objects and need to know which fields are stable.
 

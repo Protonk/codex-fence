@@ -1,13 +1,13 @@
 [package]
 name = "fencerunner"
-version = "0.6.0"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.85"
-description = "Portable sandbox probe harness: hammers on sandbox boundaries and records every observation as JSON."
+description = "Portable probe harness to determine ambient permissions by testing them directly."
 readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/Protonk/fencerunner"
-default-run = "probe"
+default-run = "fencerunner"
 # No build script; repository paths are discovered at runtime via FENCE_ROOT.
 
 [lib]
@@ -28,11 +28,6 @@ clap = { version = "4.5", features = ["derive"] }
 [[bin]]
 name = "probe-matrix"
 path = "src/bin/probe_matrix.rs"
-test = false
-
-[[bin]]
-name = "probe-target"
-path = "src/bin/probe_target.rs"
 test = false
 
 [[bin]]
@@ -66,8 +61,8 @@ path = "src/bin/probe_exec.rs"
 test = false
 
 [[bin]]
-name = "probe"
-path = "src/bin/probe_cli.rs"
+name = "fencerunner"
+path = "src/bin/fencerunner.rs"
 test = false
 
 [[bin]]

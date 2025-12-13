@@ -6,10 +6,11 @@ change behavior, update Rust here first and then sync the artifacts.
 
 ## CLI entry points (front doors)
 
-### `probe`
-Front door for `--matrix/--listen/--target`; its job is to locate helpers and set
-`FENCE_ROOT` so downstream binaries find the repo. Keep the CLI contract stable, prefer repo helpers before
-PATH, and propagate exit codes verbatim.
+### `fencerunner`
+Front door for `--bang/--bundle/--probe/--listen`; its job is to locate helpers
+and set `FENCE_ROOT` so downstream binaries find the repo. Keep the CLI
+contract stable, prefer repo helpers before PATH, and propagate exit codes
+verbatim.
 
 ### `probe-exec`
 Executes a probe in a requested mode, exporting `FENCE_*` metadata and enforcing that probes live under `probes/`. Keep probe
@@ -35,15 +36,8 @@ input with clear errors; don’t panic.
 
 ### `probe-matrix`
 Iterates probes/modes via `probe-exec`, emitting NDJSON. Reuse
-`resolve_helper_binary`, enforce mode/probe selection per docs, and keep error
-messages actionable.
-
-### `probe-target`
-Backs `probe --target` by selecting probes (by capability id or explicit
-ids) and delegating execution to `probe-matrix`. Enforce the flag contract
-(cap or probe required, `--mode` limited to baseline with the same defaults as
-`probe-matrix`), use the bundled catalog for `--cap`, and keep list-only output
-deterministic.
+`resolve_helper_binary`, enforce selection per docs (`--bang`, `--bundle`, or
+`--probe`), and keep error messages actionable.
 
 ### `probe-gate`
 Runs `tools/validate_contract_gate.sh` (the probe contract gate) with

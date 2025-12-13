@@ -1,11 +1,12 @@
 //! Top-level CLI wrapper that delegates to the synced helper binaries.
 //!
-//! The binary keeps the public `probe --matrix/--listen/--target` interface
-//! stable while resolving the real helper paths (preferring the synced `bin/`
-//! artifacts). It also injects `FENCE_ROOT` when possible so helpers can
-//! locate probes and fixtures even when invoked from an installed location.
+//! The binary keeps the public `fencerunner --bang/--bundle/--probe/--listen`
+//! interface stable while resolving the real helper paths (preferring the
+//! synced `bin/` artifacts). It also injects `FENCE_ROOT` when possible so
+//! helpers can locate probes and fixtures even when invoked from an installed
+//! location.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use fencerunner::{
     find_repo_root, resolve_helper_binary,
     runtime::{find_on_path, helper_is_executable},
@@ -36,17 +37,15 @@ struct Cli {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CommandTarget {
-    Matrix,
+    RunMatrix,
     Listen,
-    Target,
 }
 
 impl CommandTarget {
     fn helper_name(self) -> &'static str {
         match self {
-            CommandTarget::Matrix => "probe-matrix",
+            CommandTarget::RunMatrix => "probe-matrix",
             CommandTarget::Listen => "probe-listen",
-            CommandTarget::Target => "probe-target",
         }
     }
 }
@@ -55,24 +54,43 @@ impl Cli {
     fn parse() -> Result<Self> {
         let mut args = env::args_os();
         let _program = args.next();
+    let mut command: Option<CommandTarget> = None;
+    let mut trailing_args: Vec<OsString> = Vec::new();
 
-        let Some(flag) = args.next() else {
-            usage(1);
-        };
-
-        let flag_str = flag
+    while let Some(arg) = args.next() {
+        let arg_str = arg
             .to_str()
-            .with_context(|| "Invalid UTF-8 in command flag")?;
-
-        let command = match flag_str {
-            "--matrix" | "-m" => CommandTarget::Matrix,
-            "--listen" | "-l" => CommandTarget::Listen,
-            "--target" | "-t" => CommandTarget::Target,
+            .ok_or_else(|| anyhow!("Invalid UTF-8 in argument"))?;
+        match arg_str {
+            "--bang" => {
+                command.get_or_insert(CommandTarget::RunMatrix);
+                trailing_args.push(arg);
+            }
+            "--bundle" | "--probe" | "--catalog" | "--boundary" => {
+                command.get_or_insert(CommandTarget::RunMatrix);
+                trailing_args.push(arg.clone());
+                let Some(value) = args.next() else {
+                    bail!("{arg_str} requires a value");
+                };
+                trailing_args.push(value);
+            }
+            "--listen" | "-l" => {
+                if command.is_some() {
+                    bail!("--listen cannot be combined with other commands or flags");
+                }
+                command = Some(CommandTarget::Listen);
+                trailing_args.push(arg);
+                // Consume any trailing args to surface a clear error below.
+                while let Some(extra) = args.next() {
+                    bail!("--listen takes no additional flags or arguments (saw {extra:?})");
+                }
+            }
             "--help" | "-h" => usage(0),
-            _ => usage(1),
-        };
+            other => bail!("unknown argument: {other}"),
+        }
+    }
 
-        let trailing_args = args.collect();
+        let command = command.unwrap_or_else(|| usage(1));
         Ok(Self {
             command,
             trailing_args,
@@ -82,7 +100,7 @@ impl Cli {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe (--matrix | --listen | --target) [args]\n\nCommands:\n  --matrix, -m   Run the full probe matrix once and emit boundary records (NDJSON).\n  --listen, -l   Read boundary-object JSON from stdin and print a human summary.\n  --target, -t   Run a targeted probe subset (see probe-target --help).\n\nExamples:\n  probe --matrix | probe --listen\n  probe --target --probe fs_read_workspace_readme --mode baseline"
+        "Usage: fencerunner (--bang | --bundle <capability-id> | --probe <probe-id> | --listen) [args]\n\nCommands:\n  --bang               Run every probe once and emit boundary records (NDJSON).\n  --bundle <cap-id>    Run probes whose primary capability matches <cap-id>.\n  --probe <probe-id>   Run a single probe by id.\n  --listen, -l         Read boundary-object JSON from stdin and print a human summary.\n\nOptions:\n  --catalog <path>     Override capability catalog path (or set CATALOG_PATH).\n  --boundary <path>    Override boundary-object schema path (or set BOUNDARY_PATH).\n\nExamples:\n  fencerunner --bang | fencerunner --listen\n  fencerunner --probe fs_read_workspace_readme\n  fencerunner --bundle cap_fs_read_workspace_tree"
     );
     std::process::exit(code);
 }

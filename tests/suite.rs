@@ -449,20 +449,16 @@ exit 0
     Ok(())
 }
 
-// Smoke-tests the probe --target CLI end-to-end with a single probe.
+// Smoke-tests the fencerunner --probe CLI end-to-end with a single probe.
 #[test]
-fn probe_target_runs_single_probe() -> Result<()> {
+fn fencerunner_probe_runs_single_probe() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let probe = helper_binary(&repo_root, "probe");
-    let mut cmd = Command::new(&probe);
-    cmd.arg("--target")
-        .arg("--probe")
-        .arg(fixture.probe_id())
-        .arg("--mode")
-        .arg("baseline")
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let mut cmd = Command::new(&runner);
+    cmd.arg("--probe").arg(fixture.probe_id())
         .env("TEST_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8(output.stdout).context("target stdout utf-8")?;
@@ -483,56 +479,17 @@ fn probe_target_runs_single_probe() -> Result<()> {
     Ok(())
 }
 
-// Verifies --repeat fans out through probe-matrix and yields multiple boundary objects.
-#[test]
-fn probe_target_repeats_probe_runs() -> Result<()> {
-    let repo_root = repo_root();
-    let _guard = repo_guard();
-    let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
-
-    let target_runner = helper_binary(&repo_root, "probe-target");
-    let mut cmd = Command::new(&target_runner);
-    cmd.arg("--probe")
-        .arg(fixture.probe_id())
-        .arg("--mode")
-        .arg("baseline")
-        .arg("--repeat")
-        .arg("2")
-        .env("TEST_PREFER_TARGET", "1");
-    let output = run_command(cmd)?;
-    let stdout = String::from_utf8(output.stdout).context("repeat stdout utf-8")?;
-    let lines: Vec<&str> = stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect();
-    assert_eq!(
-        lines.len(),
-        2,
-        "--repeat 2 should emit two boundary objects"
-    );
-    for line in lines {
-        let (record, _) = parse_boundary_object(line.as_bytes())?;
-        assert_eq!(record.probe.id, fixture.probe_id());
-        assert_eq!(record.run.mode, "baseline");
-    }
-
-    Ok(())
-}
-
 // Ensures capability selection resolves the bundled catalog and runs every probe in that slice.
 #[test]
-fn probe_target_runs_capability_subset() -> Result<()> {
+fn fencerunner_bundle_runs_capability_subset() -> Result<()> {
     let repo_root = repo_root();
     let _guard = repo_guard();
     let fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
 
-    let target_runner = helper_binary(&repo_root, "probe-target");
-    let mut cmd = Command::new(&target_runner);
-    cmd.arg("--cap")
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let mut cmd = Command::new(&runner);
+    cmd.arg("--bundle")
         .arg("cap_fs_read_workspace_tree")
-        .arg("--mode")
-        .arg("baseline")
         .env("TEST_PREFER_TARGET", "1");
     let output = run_command(cmd)?;
     let stdout = String::from_utf8(output.stdout).context("capability stdout utf-8")?;
@@ -595,55 +552,20 @@ fn proc_paging_stress_probe_emits_expected_record() -> Result<()> {
     Ok(())
 }
 
-// Dry-run listing should summarize the plan without emitting JSON.
-#[test]
-fn probe_target_list_only_reports_plan() -> Result<()> {
-    let repo_root = repo_root();
-    let _guard = repo_guard();
-    let _fixture = FixtureProbe::install(&repo_root, "tests_fixture_probe")?;
-
-    let target_runner = helper_binary(&repo_root, "probe-target");
-    let mut cmd = Command::new(&target_runner);
-    cmd.arg("--cap")
-        .arg("cap_fs_read_workspace_tree")
-        .arg("--mode")
-        .arg("baseline")
-        .arg("--list-only")
-        .env("TEST_PREFER_TARGET", "1");
-    let output = run_command(cmd)?;
-    let stdout = String::from_utf8(output.stdout).context("list-only stdout utf-8")?;
-    assert!(
-        stdout.contains("probe target (dry-run)"),
-        "list-only output should include the dry-run banner"
-    );
-    assert!(
-        stdout.contains("modes: baseline"),
-        "list-only output should echo the resolved modes"
-    );
-    assert!(
-        stdout.contains("tests_fixture_probe"),
-        "list-only output should mention the planned probe ids"
-    );
-
-    Ok(())
-}
-
 // Error handling: unknown probe id should surface a descriptive failure.
 #[test]
-fn probe_target_errors_on_unknown_probe() -> Result<()> {
+fn fencerunner_errors_on_unknown_probe() -> Result<()> {
     let repo_root = repo_root();
-    let target_runner = helper_binary(&repo_root, "probe-target");
-    let output = Command::new(&target_runner)
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let output = Command::new(&runner)
         .arg("--probe")
         .arg("does_not_exist")
-        .arg("--mode")
-        .arg("baseline")
         .env("TEST_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute probe-target unknown probe")?;
+        .context("failed to execute fencerunner unknown probe")?;
     assert!(
         !output.status.success(),
-        "probe-target should fail for unknown probe ids"
+        "fencerunner should fail for unknown probe ids"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -655,69 +577,24 @@ fn probe_target_errors_on_unknown_probe() -> Result<()> {
 
 // Error handling: unknown capability should be rejected before execution.
 #[test]
-fn probe_target_errors_on_unknown_capability() -> Result<()> {
+fn fencerunner_errors_on_unknown_bundle() -> Result<()> {
     let repo_root = repo_root();
-    let target_runner = helper_binary(&repo_root, "probe-target");
-    let output = Command::new(&target_runner)
-        .arg("--cap")
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let output = Command::new(&runner)
+        .arg("--bundle")
         .arg("cap_does_not_exist")
-        .arg("--mode")
-        .arg("baseline")
         .env("TEST_PREFER_TARGET", "1")
         .output()
-        .context("failed to execute probe-target unknown capability")?;
+        .context("failed to execute fencerunner unknown capability")?;
     assert!(
         !output.status.success(),
-        "probe-target should fail for unknown capabilities"
+        "fencerunner should fail for unknown capabilities"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("unknown capability"),
         "stderr should explain the missing capability; got: {stderr}"
     );
-    Ok(())
-}
-
-// Validation: a selector is required, and providing both should error.
-#[test]
-fn probe_target_selector_validation() -> Result<()> {
-    let repo_root = repo_root();
-    let target_runner = helper_binary(&repo_root, "probe-target");
-
-    let missing = Command::new(&target_runner)
-        .arg("--mode")
-        .arg("baseline")
-        .env("TEST_PREFER_TARGET", "1")
-        .output()
-        .context("failed to execute probe-target without selector")?;
-    assert!(
-        !missing.status.success(),
-        "--target should fail when --cap/--probe are both absent"
-    );
-    let missing_err = String::from_utf8_lossy(&missing.stderr);
-    assert!(
-        missing_err.contains("--cap or --probe"),
-        "missing-selector error should mention required flags; stderr: {missing_err}"
-    );
-
-    let both = Command::new(&target_runner)
-        .arg("--cap")
-        .arg("cap_fs_read_workspace_tree")
-        .arg("--probe")
-        .arg("fs_read_workspace_readme")
-        .env("TEST_PREFER_TARGET", "1")
-        .output()
-        .context("failed to execute probe-target with conflicting selectors")?;
-    assert!(
-        !both.status.success(),
-        "--target should fail when both --cap and --probe are provided"
-    );
-    let both_err = String::from_utf8_lossy(&both.stderr);
-    assert!(
-        both_err.contains("exactly one"),
-        "combined-selector error should mention exclusivity; stderr: {both_err}"
-    );
-
     Ok(())
 }
 
@@ -1669,7 +1546,7 @@ primary_capability_id="cap_fs_read_workspace_tree"
 // === CLI helper smoke tests (former bin_smoke) ===
 
 #[test]
-fn probe_prefers_repo_helper() -> Result<()> {
+fn fencerunner_prefers_repo_helper() -> Result<()> {
     let repo_root = repo_root();
     let temp_repo = TempDir::new().context("failed to allocate temp repo")?;
     let repo = temp_repo.path();
@@ -1686,14 +1563,14 @@ fn probe_prefers_repo_helper() -> Result<()> {
     )?;
     make_executable(&helper_path)?;
 
-    let probe = helper_binary(&repo_root, "probe");
-    let output = Command::new(probe)
-        .arg("--matrix")
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let output = Command::new(runner)
+        .arg("--bang")
         .env("FENCE_ROOT", repo)
         .env("PATH", "")
         .env("MARK_FILE", &marker)
         .output()
-        .context("failed to run probe stub")?;
+        .context("failed to run fencerunner stub")?;
 
     assert!(output.status.success());
     assert!(marker.is_file());
@@ -1701,7 +1578,7 @@ fn probe_prefers_repo_helper() -> Result<()> {
 }
 
 #[test]
-fn probe_falls_back_to_path() -> Result<()> {
+fn fencerunner_falls_back_to_path() -> Result<()> {
     let repo_root = repo_root();
     let temp = TempDir::new().context("failed to allocate temp dir")?;
     let helper_dir = temp.path();
@@ -1713,8 +1590,8 @@ fn probe_falls_back_to_path() -> Result<()> {
     )?;
     make_executable(&helper_path)?;
 
-    let source = helper_binary(&repo_root, "probe");
-    let runner = helper_dir.join("probe");
+    let source = helper_binary(&repo_root, "fencerunner");
+    let runner = helper_dir.join("fencerunner");
     fs::copy(&source, &runner)?;
     make_executable(&runner)?;
 
@@ -1725,15 +1602,38 @@ fn probe_falls_back_to_path() -> Result<()> {
         .env("MARK_FILE", &marker)
         .current_dir(helper_dir)
         .output()
-        .context("failed to run probe path test")?;
+        .context("failed to run fencerunner path test")?;
 
     assert!(output.status.success());
     assert!(marker.is_file());
     Ok(())
 }
 
+// --listen should reject any extra flags/args and still require stdin.
 #[test]
-fn probe_exports_root_to_helpers() -> Result<()> {
+fn fencerunner_listen_rejects_extra_flags() -> Result<()> {
+    let repo_root = repo_root();
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let output = Command::new(&runner)
+        .arg("--listen")
+        .arg("--catalog")
+        .arg("dummy.json")
+        .output()
+        .context("failed to execute fencerunner --listen with extra flags")?;
+    assert!(
+        !output.status.success(),
+        "--listen should fail when extra flags are provided"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("takes no additional flags"),
+        "stderr should mention exclusivity; got: {stderr}"
+    );
+    Ok(())
+}
+
+#[test]
+fn fencerunner_exports_root_to_helpers() -> Result<()> {
     let repo_root = repo_root();
     let temp_repo = TempDir::new().context("failed to allocate temp repo")?;
     let repo = temp_repo.path();
@@ -1750,9 +1650,9 @@ fn probe_exports_root_to_helpers() -> Result<()> {
     )?;
     make_executable(&helper_path)?;
 
-    let probe = helper_binary(&repo_root, "probe");
-    let output = Command::new(probe)
-        .arg("--matrix")
+    let runner = helper_binary(&repo_root, "fencerunner");
+    let output = Command::new(runner)
+        .arg("--bang")
         .env("FENCE_ROOT", repo)
         .env("PATH", "")
         .env("MARK_FILE", &marker)

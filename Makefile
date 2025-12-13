@@ -1,4 +1,4 @@
-# probe Makefile -- single entry points for builds and tests.
+# fencerunner Makefile -- single entry points for builds and tests.
 
 SHELL := /bin/bash
 CARGO ?= cargo

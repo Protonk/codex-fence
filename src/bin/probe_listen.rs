@@ -1,7 +1,7 @@
 //! Plain-text listener that turns boundary-object NDJSON into a readable summary.
 //!
 //! This binary intentionally stays text-only so it can sit in pipelines like
-//! `probe --matrix | probe --listen`. It leans on the shared
+//! `fencerunner --bang | fencerunner --listen`. It leans on the shared
 //! boundary reader so it understands the exact boundary schema without rolling
 //! bespoke parsers.
 
@@ -32,7 +32,7 @@ fn run() -> Result<()> {
     let stdin = io::stdin();
     if stdin.is_terminal() {
         bail!(
-            "probe --listen expects boundary-object NDJSON on stdin (e.g. probe --matrix | probe --listen)"
+            "fencerunner --listen expects boundary-object NDJSON on stdin (e.g. fencerunner --bang | fencerunner --listen)"
         );
     }
 
@@ -279,7 +279,7 @@ fn repo_relative(base: Option<&Path>, candidate: &Path) -> PathBuf {
 
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe --listen [--boundary PATH]\n\nOptions:\n  --boundary PATH           Override boundary-object schema path (or set BOUNDARY_PATH).\n  --help                    Show this help text."
+        "Usage: fencerunner --listen [--boundary PATH]\n\nOptions:\n  --boundary PATH           Override boundary-object schema path (or set BOUNDARY_PATH).\n  --help                    Show this help text."
     );
     std::process::exit(code);
 }

@@ -7,7 +7,7 @@ instead, it gives you a way to **describe capabilities**, **exercise them with t
 shell probes**, and **record the results as versioned JSON “boundary objects”**
 that can be analyzed later.
 
-The top‑level CLI is called `probe`. It discovers probes, runs them in
+The top‑level CLI is called `fencerunner`. It discovers probes, runs them in
 well‑defined modes, validates their outputs against schemas and capability
 catalogs, and keeps the contract between “what probes promise” and “what
 actually ran” tight.
@@ -23,35 +23,37 @@ At a high level, Fencerunner is built from three ideas:
   exactly one observable action (for example, “write a file outside the
   workspace”) and calls a helper binary to emit a single JSON record describing
   what happened.
-- **Capability catalog** — a JSON catalog that names the behaviors you care
+- **Capability catalogs** — a JSON catalog that names the behaviors you care
   about (`cap_fs_write_workspace_tree`, `cap_net_connect_loopback`, …) and
   explains how they map onto low‑level operations. Probes refer to capabilities
   by id; the harness resolves those ids against the catalog.
-- **Boundary objects (boundary_event_v1 pattern + schema key)** — the JSON
+- **Boundary objects** — the JSON
   records emitted by each probe run. They encode the catalog key, probe
   identity, run mode, operation details, normalized outcome, payload, and
   capability context, all validated against a pattern (`schema_version:
   "boundary_event_v1"`) and tagged with a boundary schema key from the active
   descriptor (default `schema_key: "cfbo-v1"`).
 
+Connecting these three allows us to map probes to known capabilities in the catalog and homologize their output based on the boundary object. This, plus a strong contract harness around probes, allows for costless agentic generation of probes; no probe can add to noise, only to signal. 
+
 ## Core CLI surface
 
-The primary entry point is the `probe` binary (synced into `bin/probe`).
+The primary entry point is the `fencerunner` binary (synced into `bin/fencerunner`).
 
-- `probe --matrix`  
-  Run a matrix of probes across one or more run modes and stream every
-  boundary object as NDJSON. This is the usual way to “take a reading” of a
-  sandbox or runtime.
+- `fencerunner --bang`  
+  Run every probe once (modes still follow the `MODES` env fallback) and stream
+  each boundary object as NDJSON.
 
-- `probe --target`  
-  Run a focused subset of probes, selected either by probe id or by capability
-  id in the catalog. This is useful when you only care about a specific slice
-  of behavior.
+- `fencerunner --bundle <capability-id>`  
+  Run all probes whose primary capability matches `<capability-id>`.
 
-- `probe --listen`  
-  Read boundary-object NDJSON (for example, from `probe --matrix`) on stdin and
-  print a human‑readable summary. This is a text‑only viewer; it never changes
-  the underlying JSON.
+- `fencerunner --probe <probe-id>`  
+  Run a single probe by id.
+
+- `fencerunner --listen`  
+  Read boundary-object NDJSON (for example, from `fencerunner --bang`) on stdin
+  and print a human‑readable summary. This is a text‑only viewer; it never
+  changes the underlying JSON and accepts no additional flags.
 
 - `schema-validate`  
   Validate JSON as a catalog (`--mode catalog`) or boundary (`--mode boundary`)
@@ -144,19 +146,19 @@ Common workflows:
 - **Run the full probe matrix with the bundled catalog and schema**
 
   ```sh
-  bin/probe --matrix
+  bin/fencerunner --bang
   ```
 
 - **Inspect results in a human‑readable form**
 
   ```sh
-  bin/probe --matrix | bin/probe --listen
+  bin/fencerunner --bang | bin/fencerunner --listen
   ```
 
 - **Run a single probe by id**
 
   ```sh
-  bin/probe --target --probe fs_outside_workspace --mode baseline
+  bin/fencerunner --probe fs_outside_workspace
   ```
 
 - **Gate a probe while authoring**
@@ -181,7 +183,7 @@ glance:
 - `probes/` — probe scripts and their authoring contract.
 - `schema/`, `catalogs/` — JSON schemas and catalog instances.
 - `src/` — Rust library and shared runtime logic.
-- `src/bin/` — Rust helpers that back the `probe` CLI and helpers in `bin/`.
+- `src/bin/` — Rust helpers that back the `fencerunner` CLI and helpers in `bin/`.
 - `tests/` — integration suite that enforces contracts.
 - `tools/` — authoring and contract‑gate tooling.
 - `docs/` — human‑readable explanations for schemas, probes, and boundary

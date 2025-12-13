@@ -1,12 +1,9 @@
 [
   {
-    "name": "probe"
+    "name": "fencerunner"
   },
   {
     "name": "probe-matrix"
-  },
-  {
-    "name": "probe-target"
   },
   {
     "name": "probe-listen"

@@ -8,7 +8,7 @@ For quick orientation, this is how the tree is organized.
 
 | Path      | Purpose / Notes                                                                                                                                       |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/`    | Prebuilt Rust helper binaries (`probe`, `probe-exec`, `probe-matrix`, `emit-record`, `portable-path`, `detect-stack`, etc.) synced from `src/bin/`. |
+| `bin/`    | Prebuilt Rust helper binaries (`fencerunner`, `probe-exec`, `probe-matrix`, `emit-record`, `portable-path`, `detect-stack`, etc.) synced from `src/bin/`. |
 | `catalogs/` | Capability catalogs and boundary schema descriptors (bundled examples: `macos_codex_v1.json`, `cfbo-v1.json`).                                      |
 | `docs/`   | Human-readable explanations for schemas, probes, and boundary objects; kept aligned with machine contracts like `schema/*.json` and the tests.      |
 | `probes/` | Flat directory of `<probe_id>.sh` scripts plus `probes/AGENTS.md`, the only code that directly exercises the sandboxed runtime.                     |
@@ -39,7 +39,7 @@ Once you know which part of the tree you are touching, defer to the `AGENTS.md` 
 These habits let aggressive automation and human contributors coexist safely:
 
 * Use the supported workflows. For probes, iterate with `tools/validate_contract_gate.sh --probe <id>` or `bin/probe-contract-gate <id>` to get a fast, local contract gate before running the full suite.
-* Treat `bin/probe` as the top-level CLI for `--matrix`, `--target`, and `--listen`. It delegates to Rust helpers; keep its behavior aligned with the Makefile defaults and existing harness scripts rather than re-implementing probe logic in new places.
+* Treat `bin/fencerunner` as the top-level CLI for `--bang`, `--bundle`, `--probe`, and `--listen`. It delegates to Rust helpers; keep its behavior aligned with the Makefile defaults and existing harness scripts rather than re-implementing probe logic in new places.
 * Preserve portability: scripts must run identically under macOS `/bin/bash 3.2` and inside the CI container, using the Rust helpers shipped in `bin/`. Do not introduce new runtime dependencies beyond Bash and the existing Rust binaries. If you need new behavior, either express it in Bash or extend the Rust helpers and rebuild; do not add another interpreter or service to the runtime data path.
 * Keep new policy in machine artifacts—schemas, probes, tests, tools. Documentation and AGENTS files explain those artifacts; they do not replace them. If you change a contract, there should be a schema and/or test that encodes it, and the relevant `*/AGENTS.md` should point to that enforcement.
 * Use `cargo test` (or `cargo test --test suite`) as the single entry point for Rust guard rails, including schema validation and contract enforcement. All existing tests must pass to land a new contribution.

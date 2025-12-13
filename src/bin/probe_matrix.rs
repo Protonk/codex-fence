@@ -1,17 +1,19 @@
-//! Runs a probe/mode matrix and streams boundary objects as NDJSON.
+//! Runs probes and streams boundary objects as NDJSON.
 //!
-//! This binary underpins `probe --matrix`: it discovers probes
-//! (or honors `PROBES`/`PROBES_RAW`), selects modes (`MODES` or defaults based
-//! on connector availability), executes each probe via `probe-exec`, and
-//! prints each emitted JSON object on its own line.
+//! This binary underpins `fencerunner --bang/--bundle/--probe`: it discovers
+//! probes, selects the requested slice (all probes, a capability bundle, or a
+//! single probe), selects modes (`MODES` or defaults based on connector
+//! availability), executes each probe via `probe-exec`, and prints each emitted
+//! JSON object on its own line.
 
 use anyhow::{Context, Result, anyhow, bail};
 use fencerunner::connectors::{
     Availability, RunMode, allowed_mode_names, default_mode_names, parse_modes,
 };
 use fencerunner::{
-    Probe, find_repo_root, list_probes, resolve_boundary_schema_path, resolve_catalog_path,
-    resolve_helper_binary, resolve_probe, split_list,
+    CapabilityId, CapabilityIndex, Probe, find_repo_root, list_probes,
+    resolve_boundary_schema_path, resolve_catalog_path, resolve_helper_binary, resolve_probe,
+    split_list,
 };
 use serde_json::Value;
 use std::{
@@ -33,7 +35,7 @@ fn run() -> Result<()> {
     let catalog_path = resolve_catalog_path(&repo_root, cli.catalog_path.as_deref());
     let boundary_schema_path =
         resolve_boundary_schema_path(&repo_root, cli.boundary_path.as_deref())?;
-    let probes = resolve_probes(&repo_root)?;
+    let probes = resolve_probes(&repo_root, &catalog_path, &cli)?;
     let modes = resolve_modes()?;
 
     let mut errors: Vec<String> = Vec::new();
@@ -69,49 +71,64 @@ fn run() -> Result<()> {
 }
 
 fn resolve_modes() -> Result<Vec<RunMode>> {
-    let requested = env::var("MODES")
-        .ok()
-        .and_then(|raw| {
-            let parsed = split_list(&raw);
-            if parsed.is_empty() {
-                None
-            } else {
-                Some(parsed)
-            }
-        })
-        .unwrap_or_else(|| default_mode_names(Availability::for_host()));
+    let requested = env::var("MODES").ok().and_then(|raw| {
+        let parsed = split_list(&raw);
+        if parsed.is_empty() {
+            None
+        } else {
+            Some(parsed)
+        }
+    });
 
-    if requested.is_empty() {
+    let mode_names = requested.unwrap_or_else(|| default_mode_names(Availability::for_host()));
+
+    if mode_names.is_empty() {
         bail!("No modes resolved; check MODES env var");
     }
 
     let allowed = allowed_mode_names();
-    if let Some(bad) = requested
+    if let Some(bad) = mode_names
         .iter()
         .find(|mode| !allowed.contains(&mode.as_str()))
     {
         bail!("Unsupported mode requested: {bad}");
     }
 
-    parse_modes(&requested)
+    parse_modes(&mode_names)
 }
 
-fn resolve_probes(repo_root: &Path) -> Result<Vec<Probe>> {
-    let requested = env::var("PROBES")
-        .or_else(|_| env::var("PROBES_RAW"))
-        .ok()
-        .map(|raw| split_list(&raw))
-        .unwrap_or_default();
+fn resolve_probes(repo_root: &Path, catalog_path: &Path, cli: &Cli) -> Result<Vec<Probe>> {
+    match cli.selection {
+        Selection::All { explicit } => {
+            if explicit {
+                return list_probes(repo_root);
+            }
+            let requested = env::var("PROBES")
+                .or_else(|_| env::var("PROBES_RAW"))
+                .ok()
+                .map(|raw| split_list(&raw))
+                .unwrap_or_default();
 
-    if requested.is_empty() {
-        return list_probes(repo_root);
+            if requested.is_empty() {
+                list_probes(repo_root)
+            } else {
+                let mut probes = Vec::new();
+                for raw in requested {
+                    probes.push(resolve_probe(repo_root, &raw)?);
+                }
+                Ok(probes)
+            }
+        }
+        Selection::Probe(ref id) => Ok(vec![resolve_probe(repo_root, id)?]),
+        Selection::Bundle(ref id) => {
+            let index = CapabilityIndex::load(catalog_path)?;
+            let capability = CapabilityId(id.clone());
+            if index.capability(&capability).is_none() {
+                bail!("unknown capability '{}'", id);
+            }
+            probes_for_capability(repo_root, &capability)
+        }
     }
-
-    let mut probes = Vec::new();
-    for raw in requested {
-        probes.push(resolve_probe(repo_root, &raw)?);
-    }
-    Ok(probes)
 }
 
 fn run_probe(
@@ -154,7 +171,31 @@ fn run_probe(
     Ok(())
 }
 
+fn probes_for_capability(repo_root: &Path, capability: &CapabilityId) -> Result<Vec<Probe>> {
+    let mut matches = Vec::new();
+    for probe in list_probes(repo_root)? {
+        let metadata = fencerunner::ProbeMetadata::from_script(&probe.path)?;
+        if metadata
+            .primary_capability
+            .as_ref()
+            .map(|id| id == capability)
+            .unwrap_or(false)
+        {
+            matches.push(probe);
+        }
+    }
+    matches.sort_by(|a, b| a.id.cmp(&b.id));
+    if matches.is_empty() {
+        bail!(
+            "capability '{}' has no probes in this workspace",
+            capability.0
+        );
+    }
+    Ok(matches)
+}
+
 struct Cli {
+    selection: Selection,
     catalog_path: Option<PathBuf>,
     boundary_path: Option<PathBuf>,
 }
@@ -163,6 +204,7 @@ impl Cli {
     fn parse() -> Result<Self> {
         let mut args = env::args_os();
         let _program = args.next();
+        let mut selection: Option<Selection> = None;
         let mut catalog_path = None;
         let mut boundary_path = None;
 
@@ -171,6 +213,17 @@ impl Cli {
                 .to_str()
                 .ok_or_else(|| anyhow!("invalid UTF-8 in argument"))?;
             match arg_str {
+                "--bang" => {
+                    selection = Some(Selection::All { explicit: true });
+                }
+                "--bundle" => {
+                    let value = next_value("--bundle", &mut args)?;
+                    selection = set_selection(selection, Selection::Bundle(value))?;
+                }
+                "--probe" => {
+                    let value = next_value("--probe", &mut args)?;
+                    selection = set_selection(selection, Selection::Probe(value))?;
+                }
                 "--catalog" => catalog_path = Some(next_path("--catalog", &mut args)?),
                 "--boundary" => boundary_path = Some(next_path("--boundary", &mut args)?),
                 "--help" | "-h" => usage(0),
@@ -179,6 +232,7 @@ impl Cli {
         }
 
         Ok(Self {
+            selection: selection.unwrap_or(Selection::All { explicit: false }),
             catalog_path,
             boundary_path,
         })
@@ -200,9 +254,40 @@ fn next_path(flag: &str, args: &mut env::ArgsOs) -> Result<PathBuf> {
     Ok(path)
 }
 
+fn next_value(flag: &str, args: &mut env::ArgsOs) -> Result<String> {
+    let value = args
+        .next()
+        .ok_or_else(|| anyhow!("{flag} requires a value"))?;
+    value
+        .into_string()
+        .map_err(|_| anyhow!("{flag} value must be valid UTF-8"))
+        .and_then(|raw| {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                bail!("{flag} value must not be empty");
+            }
+            Ok(trimmed.to_string())
+        })
+}
+
+fn set_selection(current: Option<Selection>, new_sel: Selection) -> Result<Option<Selection>> {
+    match current {
+        None => Ok(Some(new_sel)),
+        Some(Selection::All { explicit: false }) => Ok(Some(new_sel)),
+        Some(_) => bail!("select exactly one of --bang, --bundle, or --probe"),
+    }
+}
+
+#[derive(Clone)]
+enum Selection {
+    All { explicit: bool },
+    Bundle(String),
+    Probe(String),
+}
+
 fn usage(code: i32) -> ! {
     eprintln!(
-        "Usage: probe-matrix [--catalog PATH] [--boundary PATH]\n\nOptions:\n  --catalog PATH            Override capability catalog path (or set CATALOG_PATH).\n  --boundary PATH           Override boundary-object schema path (or set BOUNDARY_PATH).\n  --help                    Show this help text."
+        "Usage: probe-matrix (--bang | --bundle <capability-id> | --probe <probe-id>) [--catalog PATH] [--boundary PATH]\n\nCommands:\n  --bang                 Run every probe once.\n  --bundle <capability>  Run probes whose primary capability matches <capability>.\n  --probe <id>           Run a single probe by id.\n\nOptions:\n  --catalog PATH         Override capability catalog path (or set CATALOG_PATH).\n  --boundary PATH        Override boundary-object schema path (or set BOUNDARY_PATH).\n  --help                 Show this help text."
     );
     std::process::exit(code);
 }

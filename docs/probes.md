@@ -1,6 +1,6 @@
 # Probes
 
-Probes are the smallest unit of observation in `probe`. Each one is a
+Probes are the smallest unit of observation in `fencerunner`. Each one is a
 single Bash script stored directly under `probes/<probe_id>.sh` (the filename
 matches the probe id), performs a single well-defined action, and reports what
 the harness observed in that sandbox. This document explains how probes are
@@ -47,7 +47,7 @@ This file serves as documentation. For authoritative, test-enforced Probe and Pr
    sandboxing. (This is the only supported mode after removing Codex-specific
    runners.)
 3. **Result capture** – the probe prints one JSON boundary object to stdout.
-  `probe --matrix` streams every record as NDJSON so you can capture and diff
+  `fencerunner --bang` streams every record as NDJSON so you can capture and diff
   runs across modes, CLI versions, or host machines.
 
 ## What a probe emits

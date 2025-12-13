@@ -79,7 +79,7 @@ A probe:
    built inline). Pass `--run-mode "$FENCE_RUN_MODE"` (exported by
    `bin/probe-exec`) so the emitted record matches the current mode.
 5. Exits with status `0` after emitting JSON. `bin/probe-exec` relies on this
-  behavior so `probe --matrix` can stream records as NDJSON.
+  behavior so `fencerunner --bang` can stream records as NDJSON.
 
 ### How a probe should emit JSON
 
