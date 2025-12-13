@@ -32,8 +32,8 @@ At a high level, Fencerunner is built from three ideas:
   with a boundary schema key from the active descriptor (default
   `schema_key: "cfbo-v1"`).
 
-Together, these let you map probe results to named capabilities and keep the
-output analyzable over time. The contract harness is intentionally strict so
+Together, these map probe results to named capabilities and keep the
+output analyzable over multiple runs. The contract harness is intentionally strict so
 new probes add signal without breaking downstream consumers.
 
 ## Usage
@@ -58,29 +58,6 @@ Build the helpers into `bin/`:
 make build
 ```
 
-Common workflows:
-
-- **Run the full probe matrix with the bundled catalog and schema**
-
-  ```sh
-  fencerunner --bang
-  ```
-
-- **Inspect results in a human‑readable form**
-
-  ```sh
-  fencerunner --bang | fencerunner --listen
-  ```
-
-- **Run a single probe by id**
-
-  ```sh
-  fencerunner --probe fs_outside_workspace
-  ```
-
-When you change Rust code under `src/` or `src/bin/`, rebuild helpers with
-`make build` and re‑run `make test` to keep `bin/` and the test suite aligned.
-
 ### Core CLI surface
 
 The primary entry point is the `fencerunner` binary (synced into `bin/fencerunner`).
@@ -89,16 +66,35 @@ The primary entry point is the `fencerunner` binary (synced into `bin/fencerunne
   Run every probe once (modes still follow the `MODES` env fallback) and stream
   each boundary object as NDJSON.
 
+- **Run the full probe matrix with the bundled catalog and schema**
+
+  ```sh
+  fencerunner --bang
+  ```
+
 - `fencerunner --bundle <capability-id>`  
   Run all probes whose primary capability matches `<capability-id>`.
 
 - `fencerunner --probe <probe-id>`  
   Run a single probe by id.
 
+- **Run a single probe by id**
+
+  ```sh
+  fencerunner --probe fs_outside_workspace
+  ```
+
 - `fencerunner --listen`  
   Read boundary-object NDJSON (for example, from `fencerunner --bang`) on stdin
   and print a human‑readable summary. This is a text‑only viewer; it never
   changes the underlying JSON and accepts no additional flags.
+
+- **Inspect results in a human‑readable form**
+
+  ```sh
+  fencerunner --bang | fencerunner --listen
+  ```
+
 
 - `schema-validate`  
   Validate JSON as a catalog (`--mode catalog`) or boundary (`--mode boundary`)
