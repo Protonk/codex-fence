@@ -156,7 +156,7 @@ fn extract_capability_ids(value: &Value) -> Vec<CapabilityId> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{default_catalog_path, find_repo_root, load_catalog_from_path};
+    use crate::{default_catalog_path, find_repo_root, load_catalog_from_path, BoundarySchema};
     use serde_json::json;
     use std::path::PathBuf;
     use std::sync::OnceLock;

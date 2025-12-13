@@ -7,9 +7,8 @@ single command now executes the entire suite.
 
 ## Mission control
 
-1. **Single entry point:** `cargo test` (or `cargo test --test suite`) runs
-   everything. There are no other Rust targets or doctests, so noisy output
-   means something regressed.
+1. **Single entry point:** `cargo test` runs everything. There are no other
+   Rust targets or doctests, so noisy output means something regressed.
 2. **Board must stay green:** the suite encodes the portability + contract
    guarantees promised in `README.md`, `CONTRIBUTING.md`, and the schema docs.
    If the suite fails you either broke a contract or you discovered an existing
@@ -22,16 +21,22 @@ single command now executes the entire suite.
 
 | Path | Purpose | Notes |
 | --- | --- | --- |
-| `tests/suite.rs` | Single integration entry point. | Host for every guard rail: contract gates, schema checks, CLI smokes, workspace invariants. Target individual cases with `cargo test --test suite <name>`. |
+| `tests/schema.rs` | Boundary + catalog schema guards. | Boundary descriptor validation and serde round-trips for boundary/capability types. |
+| `tests/catalog.rs` | Catalog repository + lookup invariants. | Catalog loading, schema_version enforcement, and lookup context checks. |
+| `tests/probe_execution.rs` | Probe execution + workspace planning. | `probe-exec` smokes, probe resolution fences, workspace overrides/tmpdir behavior. |
+| `tests/contracts.rs` | Contract gates + emit-record rules. | Static/dynamic gates, emit-record flag enforcement, status/secondary normalization. |
+| `tests/cli.rs` | CLI and harness behavior. | `fencerunner`/`probe-matrix` ergonomics, helper resolution, env propagation, sandbox detection. |
+| `tests/helpers.rs` | Helper binaries + utility probes. | `json-extract`, `portable-path`, paging-stress, compiled probe smokes, builder helpers. |
+| `tests/support/common.rs` | Cross-test fixtures. | Shared probe fixtures (`FixtureProbe`), repo/workspace guards, and sample boundary/capability builders used by multiple targets. |
 | `tests/support/` | Shared helpers. | Builds helper binaries once per run, provides temp repositories, mutex guards, path utilities. Always prefer these over ad-hoc fixtures. |
 | `tests/mocks/` | Shell fixtures used by the suite. | Minimal probes and data files that suite tests can execute. Keep side-effects inside the provided temp dirs. |
 
 ## Running and diagnosing tests
 
-- **Full sweep:** `cargo test`. Watch for exactly two sections of output: the
-  empty library unit bucket and `tests/suite.rs`. Anything else means someone
-  reintroduced stray targets.
-- **Focused run:** `cargo test --test suite <name>` to iterate on a failing case.
+- **Full sweep:** `cargo test`. Watch for the expected integration targets:
+  `schema`, `catalog`, `probe_execution`, `contracts`, `cli`, `helpers`. Anything else means someone reintroduced stray targets.
+- **Focused run:** `cargo test --test <target> <name>` (e.g.
+  `cargo test --test cli fencerunner_bundle_runs_capability_subset`) to iterate on a failing case.
   Use `-- --nocapture` when you need stdout/stderr from helpers.
 - **Probe contract loop:** `tools/validate_contract_gate.sh --probe <id>` (or
   `bin/probe-contract-gate <id>`) is still the fastest way to vet a single probe. The
@@ -45,11 +50,12 @@ single command now executes the entire suite.
 1. **Decide the contract you are protecting.** Examples: boundary-object shape,
    helper CLI semantics, workspace isolation, catalog synchronization. Cite that
    contract in the test name or first comment.
-2. **Use `tests/support`.**
-   - `support::helpers()` builds binaries once and caches their paths.
-   - `TempRepo` hands you a throwaway workspace with automatic cleanup.
-   - `ProbeFixture` gives you ready-made probe metadata. Never invent new path
-     juggling logic when a helper already exists.
+2. **Use the shared helpers.**
+   - `tests/support` provides `helper_binary`, `run_command`, and `repo_root` plus
+     helper builders with cached compilation.
+   - `tests/support/common` exposes `FixtureProbe`, `TempRepo`, `TempWorkspace`, repo locks,
+     and sample boundary/capability builders. Never invent new path juggling logic
+     when a helper already exists.
 3. **Keep tests hermetic.** Write to the temp repo created by the helper, avoid
    touching the real workspace, and guard shared global state with the provided
    mutex.
@@ -65,11 +71,11 @@ single command now executes the entire suite.
 
 | Contract surface | Representative tests |
 | --- | --- |
-| Boundary object schema + payload semantics | `boundary_object_schema`, `boundary_schema_matches_contract`, `boundary_object_round_trips_structs`, `capabilities_schema_version_serializes_in_json` |
-| Capability catalog + context wiring | `load_real_catalog_smoke`, `repository_lookup_context_matches_capabilities`, `capability_snapshot_serializes_to_expected_shape` |
-| Helper binaries & CLI ergonomics | `json_extract_*`, `portable_path_relpath_*`, `detect_stack_reports_expected_sandbox_modes`, `paging_stress_*`, `contract_gate_*`, `probe_matrix_*`, `fencerunner_*` |
-| Workspace + sandbox guarantees | `workspace_root_fallback`, `workspace_tmpdir_*`, `probe_resolution_guards` |
-| Probe contracts & fixtures | `harness_smoke_probe_fixture`, `dynamic_probe_contract_accepts_fixture`, `static_probe_contract_*`, `proc_paging_stress_probe_emits_expected_record` |
+| Boundary object schema + payload semantics (schema.rs) | `boundary_object_schema`, `boundary_schema_matches_contract`, `boundary_object_round_trips_structs`, `capabilities_schema_version_serializes_in_json` |
+| Capability catalog + context wiring (catalog.rs) | `load_real_catalog_smoke`, `repository_lookup_context_matches_capabilities`, `capability_index_*` |
+| Helper binaries & CLI ergonomics (cli.rs, helpers.rs) | `json_extract_*`, `portable_path_relpath_*`, `detect_stack_reports_expected_sandbox_modes`, `paging_stress_*`, `contract_gate_*`, `probe_matrix_*`, `fencerunner_*` |
+| Workspace + sandbox guarantees (probe_execution.rs) | `workspace_root_fallback`, `workspace_tmpdir_*`, `probe_resolution_guards`, `resolve_probe_metadata_prefers_script_values` |
+| Probe contracts & fixtures (contracts.rs) | `harness_smoke_probe_fixture`, `dynamic_probe_contract_accepts_fixture`, `static_probe_contract_*`, `proc_paging_stress_probe_emits_expected_record` |
 
 Use this table to decide where to plug a new test. If your change touches a
 contract without an obvious row, add both the row and the tests.

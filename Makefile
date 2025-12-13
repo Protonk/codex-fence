@@ -16,4 +16,4 @@ build: clean-bin
 
 # Always run tests against freshly rebuilt helpers.
 test: build
-	$(CARGO) test --test suite
+	$(CARGO) test

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{Context, Result, bail};
 use fencerunner::find_repo_root;
 use std::path::{Path, PathBuf};
